@@ -17,6 +17,16 @@ public class SafeMovementRepository : ISafeMovementRepository
         => await _context.SafeMovements.OrderBy(x => x.TransactionDate).ToListAsync(cancellationToken);
 
     /// <summary>
+    /// Sadece manuel eklenen kasa hareketlerini döndür (alış-satıştan otomatik oluşanlar hariç).
+    /// </summary>
+    public async Task<IReadOnlyList<Core.Entities.SafeMovement>> GetManualMovementsAsync(CancellationToken cancellationToken = default)
+        => await _context.SafeMovements
+            .Where(x => x.SourceTransactionId == null)
+            .OrderByDescending(x => x.TransactionDate)
+            .ThenByDescending(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+    /// <summary>
     /// Kasa bakiyesi: SUM(HasGram) - Excel'deki ANA SERMAYE (HAS-GR) = SUM(D3:D600)
     /// </summary>
     public async Task<decimal> GetTotalHasGramBalanceAsync(CancellationToken cancellationToken = default)
@@ -27,4 +37,8 @@ public class SafeMovementRepository : ISafeMovementRepository
         await _context.SafeMovements.AddAsync(entity, cancellationToken);
         return entity;
     }
+
+    public void Update(Core.Entities.SafeMovement entity) => _context.SafeMovements.Update(entity);
+
+    public void Delete(Core.Entities.SafeMovement entity) => _context.SafeMovements.Remove(entity);
 }

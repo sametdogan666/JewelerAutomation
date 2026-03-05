@@ -30,6 +30,8 @@ builder.Services.AddScoped<ICustomerTransactionRepository, CustomerTransactionRe
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 builder.Services.AddScoped<IAccountingService, AccountingService>();
+builder.Services.AddScoped<ICapitalCalculationService, CapitalCalculationService>();
+builder.Services.AddScoped<ISafeStatusService, SafeStatusService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 
 // JWT
@@ -47,7 +49,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidAudience = builder.Configuration["Jwt:Audience"] ?? "JewelerAutomation",
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
+            ClockSkew = TimeSpan.FromSeconds(30) // Küçük saat farkında 401 önlenir
         };
     });
 builder.Services.AddAuthorization();
@@ -59,6 +61,7 @@ builder.Services.AddCors(options =>
         policy.WithOrigins((builder.Configuration["Cors:Origins"] ?? "http://localhost:4200").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             .AllowAnyHeader()
             .AllowAnyMethod()
+            .WithExposedHeaders("Authorization")
             .AllowCredentials();
     });
 });
@@ -92,7 +95,11 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
-app.UseHttpsRedirection();
+// Development'ta HTTPS redirect yok (proxy + token için); production'da aktif
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

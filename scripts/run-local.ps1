@@ -33,5 +33,5 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", "npm start"
 
 Write-Host ""
 Write-Host "Her iki uygulama ayri pencerelerde acildi." -ForegroundColor Green
-Write-Host "Giris: http://localhost:4200  ->  Kullanici: admin  Sifre: Admin123!" -ForegroundColor Green
+Write-Host "Giris: http://localhost:4200  ->  Kullanici: admin  Sifre: 122333" -ForegroundColor Green
 Write-Host ""

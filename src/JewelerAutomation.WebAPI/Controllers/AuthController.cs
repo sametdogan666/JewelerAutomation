@@ -22,7 +22,7 @@ public class AuthController : ControllerBase
 
     /// <summary>
     /// Login with UserName and Password. Returns JWT token.
-    /// Seed admin: UserName=admin, Password=Admin123!
+    /// Seed admin: UserName=admin, Password=122333
     /// </summary>
     [HttpPost("login")]
     [AllowAnonymous]
@@ -41,14 +41,16 @@ public class AuthController : ControllerBase
             return Unauthorized("Invalid user or password.");
 
         var token = _jwtService.GenerateToken(user);
-        var expiryMinutes = int.TryParse(HttpContext.RequestServices.GetService<IConfiguration>()?["Jwt:ExpiryMinutes"], out var m) ? m : 60;
+        var config = HttpContext.RequestServices.GetService<IConfiguration>();
+        var expiryMinutes = int.TryParse(config?["Jwt:ExpiryMinutes"], out var m) && m > 0 ? m : 480; // 8 saat varsayılan
+        var expiresAtUtc = DateTime.UtcNow.AddMinutes(expiryMinutes);
 
         return Ok(new LoginResponse
         {
             Token = token,
             UserName = user.UserName,
             Role = user.Role,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes)
+            ExpiresAt = DateTime.SpecifyKind(expiresAtUtc, DateTimeKind.Utc) // UTC; frontend yerel saate çevirir
         });
     }
 }

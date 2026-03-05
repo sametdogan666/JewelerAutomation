@@ -21,6 +21,10 @@
   }
 }
 
+.widget-section {
+  margin-bottom: var(--spacing-xl);
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -53,8 +57,20 @@
     }
   }
 
-  .stat-card--balance .stat-icon {
+  .stat-card--net-capital .stat-icon {
+    background: linear-gradient(135deg, #6a1b9a 0%, #9c27b0 100%);
+  }
+
+  .stat-card--gold-safe .stat-icon {
     background: linear-gradient(135deg, #3949ab 0%, #5c6bc0 100%);
+  }
+
+  .stat-card--debt .stat-icon {
+    background: linear-gradient(135deg, #c62828 0%, #f44336 100%);
+  }
+
+  .stat-card--receivable .stat-icon {
+    background: linear-gradient(135deg, #00838f 0%, #00bcd4 100%);
   }
 
   .stat-card--customers .stat-icon {

@@ -104,6 +104,93 @@ public class TransactionsController : ControllerBase
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return CreatedAtAction(nameof(GetById), new { id = transaction.Id }, transaction);
     }
+
+    /// <summary>
+    /// İşlemi güncelle (düzenle). Not: Kasa hareketi elle güncellenmelidir.
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<Transaction>> Update(Guid id, [FromBody] TransactionCreateDto dto, CancellationToken cancellationToken)
+    {
+        var transaction = await _unitOfWork.Transactions.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
+        if (transaction == null) return NotFound();
+
+        decimal hasGram;
+        decimal totalLabour = 0;
+        decimal milyemLabour;
+
+        if (dto.Direction == TransactionDirection.Sale)
+        {
+            int pieces = dto.PieceCount ?? 0;
+            decimal unitLabour = dto.UnitLabour ?? 0;
+            totalLabour = _accounting.CalculateTotalLabour(pieces, unitLabour, subtract: true);
+            hasGram = _accounting.CalculateHasGramWithLabour(dto.Quantity, dto.Milyem, totalLabour);
+            milyemLabour = _accounting.CalculateMilyemLabour(dto.Quantity, dto.Milyem);
+        }
+        else
+        {
+            hasGram = _accounting.CalculateHasGram(dto.Quantity, dto.Milyem);
+            milyemLabour = _accounting.CalculateMilyemLabour(dto.Quantity, dto.Milyem);
+        }
+
+        transaction.TransactionDate = dto.TransactionDate;
+        transaction.Direction = dto.Direction;
+        transaction.Quantity = dto.Quantity;
+        transaction.Milyem = dto.Milyem;
+        transaction.PieceCount = dto.PieceCount;
+        transaction.UnitLabour = dto.UnitLabour;
+        transaction.TotalLabour = totalLabour;
+        transaction.HasGram = hasGram;
+        transaction.Price = dto.Price;
+        transaction.Description = dto.Description;
+        transaction.MilyemLabour = milyemLabour;
+        transaction.CustomerId = dto.CustomerId;
+        transaction.UpdatedAt = DateTime.UtcNow;
+
+        _unitOfWork.Transactions.Update(transaction);
+
+        // İlişkili kasa hareketini güncelle
+        var safeMovements = await _unitOfWork.SafeMovements.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var relatedMovement = safeMovements.FirstOrDefault(m => m.SourceTransactionId == id);
+        if (relatedMovement != null)
+        {
+            var kasaGram = dto.Direction == TransactionDirection.Sale ? -dto.Quantity : dto.Quantity;
+            var kasaHasGram = dto.Direction == TransactionDirection.Sale ? -hasGram : hasGram;
+            relatedMovement.TransactionDate = dto.TransactionDate;
+            relatedMovement.Gram = kasaGram;
+            relatedMovement.Milyem = dto.Milyem;
+            relatedMovement.HasGram = kasaHasGram;
+            relatedMovement.Description = dto.Direction == TransactionDirection.Sale
+                ? $"Satış: {dto.Description ?? "—"}"
+                : $"Alış: {dto.Description ?? "—"}";
+            relatedMovement.MovementType = dto.Direction == TransactionDirection.Sale ? SafeMovementType.Expense : SafeMovementType.Income;
+            relatedMovement.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return Ok(transaction);
+    }
+
+    /// <summary>
+    /// İşlemi sil ve ilişkili kasa hareketini kaldır.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var transaction = await _unitOfWork.Transactions.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
+        if (transaction == null) return NotFound();
+
+        // İlişkili kasa hareketini bul ve sil
+        var safeMovements = await _unitOfWork.SafeMovements.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var relatedMovement = safeMovements.FirstOrDefault(m => m.SourceTransactionId == id);
+        if (relatedMovement != null)
+        {
+            _unitOfWork.SafeMovements.Delete(relatedMovement);
+        }
+
+        _unitOfWork.Transactions.Delete(transaction);
+        await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return NoContent();
+    }
 }
 
 public record TransactionCreateDto(

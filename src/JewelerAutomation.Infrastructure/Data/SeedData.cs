@@ -10,7 +10,7 @@ public static class SeedData
 {
     /// <summary>
     /// Admin kullanıcısı (UserName: admin). Şifre hash'i BCrypt ile.
-    /// Başlangıç şifresi: Admin123!
+    /// Başlangıç şifresi: 122333
     /// </summary>
     public static async Task SeedAdminUserAsync(IServiceProvider serviceProvider)
     {
@@ -18,13 +18,18 @@ public static class SeedData
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<AppDbContext>>();
 
-        if (await db.Users.AnyAsync(u => u.NormalizedUserName == "ADMIN").ConfigureAwait(false))
+        const string adminPassword = "122333";
+        var adminUser = await db.Users.FirstOrDefaultAsync(u => u.NormalizedUserName == "ADMIN").ConfigureAwait(false);
+
+        if (adminUser != null)
         {
-            logger.LogInformation("Admin user already exists.");
+            adminUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
+            await db.SaveChangesAsync().ConfigureAwait(false);
+            logger.LogInformation("Admin password updated to: 122333");
             return;
         }
 
-        var passwordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!");
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
         var admin = new User
         {
             UserName = "admin",
@@ -35,7 +40,7 @@ public static class SeedData
         };
         db.Users.Add(admin);
         await db.SaveChangesAsync().ConfigureAwait(false);
-        logger.LogInformation("Admin user created. Default password: Admin123!");
+        logger.LogInformation("Admin user created. Default password: 122333");
     }
 
     /// <summary>

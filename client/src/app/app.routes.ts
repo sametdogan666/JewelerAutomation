@@ -17,6 +17,7 @@ export const routes: Routes = [
       { path: 'kasa', loadComponent: () => import('./features/kasa/kasa.component').then(m => m.KasaComponent) },
       { path: 'transactions', loadComponent: () => import('./features/transactions/transactions-list.component').then(m => m.TransactionsListComponent) },
       { path: 'transactions/new', loadComponent: () => import('./features/transactions/transaction-form.component').then(m => m.TransactionFormComponent) },
+      { path: 'transactions/:id/edit', loadComponent: () => import('./features/transactions/transaction-form.component').then(m => m.TransactionFormComponent) },
     ],
   },
   { path: '**', redirectTo: '' },

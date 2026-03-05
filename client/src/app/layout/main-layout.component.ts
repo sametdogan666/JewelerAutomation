@@ -36,7 +36,7 @@ export class MainLayoutComponent {
 
   navItems = [
     { path: '/dashboard', icon: 'dashboard', label: 'Panel' },
-    { path: '/transactions', icon: 'swap_horiz', label: 'Alış-Satış' },
+    { path: '/transactions', icon: 'shopping_cart', label: 'İşlemler' },
     { path: '/customers', icon: 'people', label: 'Cariler' },
     { path: '/kasa', icon: 'account_balance_wallet', label: 'Kasa' },
   ];

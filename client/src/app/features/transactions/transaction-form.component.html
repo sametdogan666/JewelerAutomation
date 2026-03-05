@@ -5,8 +5,8 @@
       Alış-Satış listesi
     </a>
     <div class="page-title-block">
-      <h1 class="page-title">Yeni işlem</h1>
-      <p class="page-subtitle">Altın alış veya satış kaydı oluşturun. Has Gram otomatik hesaplanır.</p>
+      <h1 class="page-title">{{ editMode() ? 'İşlemi düzenle' : 'Yeni işlem' }}</h1>
+      <p class="page-subtitle">Altın alış veya satış kaydı {{ editMode() ? 'güncelleyin' : 'oluşturun' }}. Has Gram otomatik hesaplanır.</p>
     </div>
   </div>
 
@@ -94,7 +94,7 @@
                 </mat-form-field>
                 <mat-form-field appearance="outline">
                   <mat-label>Birim işçilik (TL)</mat-label>
-                  <input matInput type="number" formControlName="unitLabour" />
+                  <input matInput type="text" formControlName="unitLabour" mask="separator.2" thousandSeparator="." decimalMarker="," />
                 </mat-form-field>
               </div>
             </mat-card-content>
@@ -111,7 +111,7 @@
             <div class="form-row form-row--2">
               <mat-form-field appearance="outline">
                 <mat-label>Fiyat (TL)</mat-label>
-                <input matInput type="number" formControlName="price" min="0" />
+                <input matInput type="text" formControlName="price" mask="separator.2" thousandSeparator="." decimalMarker="," />
                 <mat-hint>İsteğe bağlı</mat-hint>
               </mat-form-field>
               <mat-form-field appearance="outline">

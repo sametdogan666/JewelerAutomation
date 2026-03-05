@@ -37,4 +37,6 @@ public class TransactionRepository : ITransactionRepository
     }
 
     public void Update(Transaction entity) => _context.Transactions.Update(entity);
+
+    public void Delete(Transaction entity) => _context.Transactions.Remove(entity);
 }

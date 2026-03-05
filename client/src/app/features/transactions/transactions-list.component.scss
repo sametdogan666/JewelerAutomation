@@ -115,4 +115,16 @@
     background: #e8f5e9;
     color: #2e7d32;
   }
+
+  .actions-header {
+    text-align: right;
+    width: 120px;
+  }
+
+  .actions-cell {
+    text-align: right;
+    display: flex;
+    gap: 0.25rem;
+    justify-content: flex-end;
+  }
 }

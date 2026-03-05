@@ -1,5 +1,5 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -10,6 +10,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { DecimalPipe } from '@angular/common';
+import { NgxMaskDirective } from 'ngx-mask';
 import { TransactionsService, TransactionCreate, TransactionDirection } from '../../core/services/transactions.service';
 import { CustomersService, Customer } from '../../core/services/customers.service';
 
@@ -31,6 +32,7 @@ const LABOUR_FACTOR = 0.01;
     MatRadioModule,
     MatProgressSpinnerModule,
     DecimalPipe,
+    NgxMaskDirective,
   ],
   templateUrl: './transaction-form.component.html',
   styleUrl: './transaction-form.component.scss',
@@ -40,9 +42,12 @@ export class TransactionFormComponent implements OnInit {
   private transactionsApi = inject(TransactionsService);
   private customersApi = inject(CustomersService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   customers = signal<Customer[]>([]);
   saving = signal(false);
+  editMode = signal(false);
+  transactionId = signal<string | null>(null);
 
   form = this.fb.nonNullable.group({
     direction: [0 as TransactionDirection, Validators.required],
@@ -93,6 +98,27 @@ export class TransactionFormComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    const id = this.route.snapshot.paramMap.get('id');
+    if (id) {
+      this.editMode.set(true);
+      this.transactionId.set(id);
+      this.transactionsApi.getById(id).subscribe({
+        next: (transaction) => {
+          this.form.patchValue({
+            direction: transaction.direction,
+            transactionDate: new Date(transaction.transactionDate).toISOString().slice(0, 10),
+            quantity: transaction.quantity,
+            milyem: transaction.milyem,
+            pieceCount: transaction.pieceCount ?? 0,
+            unitLabour: transaction.unitLabour ?? 0,
+            price: transaction.price ?? 0,
+            description: transaction.description ?? '',
+            customerId: transaction.customerId ?? null,
+          });
+          this.formSnapshot.set(this.form.getRawValue());
+        },
+      });
+    }
     this.customersApi.getAll().subscribe((list) => this.customers.set(list));
     this.form.valueChanges.subscribe(() => this.formSnapshot.set(this.form.getRawValue()));
   }
@@ -104,19 +130,33 @@ export class TransactionFormComponent implements OnInit {
   onSubmit(): void {
     if (this.form.invalid || this.saving()) return;
     const v = this.form.getRawValue();
+    
+    // Parse masked values (ngx-mask returns string with dots, convert to number)
+    const parsePrice = (val: any): number | undefined => {
+      if (val == null || val === '' || val === 0) return undefined;
+      const str = String(val).replace(/\./g, '').replace(/,/g, '.');
+      const num = parseFloat(str);
+      return isNaN(num) || num === 0 ? undefined : num;
+    };
+
     const dto: TransactionCreate = {
       transactionDate: new Date(v.transactionDate).toISOString(),
       direction: v.direction,
       quantity: v.quantity,
       milyem: v.milyem,
       pieceCount: v.pieceCount && v.pieceCount > 0 ? v.pieceCount : undefined,
-      unitLabour: v.unitLabour && v.unitLabour !== 0 ? v.unitLabour : undefined,
-      price: v.price != null && v.price !== 0 ? v.price : undefined,
+      unitLabour: parsePrice(v.unitLabour),
+      price: parsePrice(v.price),
       description: v.description || undefined,
       customerId: v.customerId || undefined,
     };
+    
     this.saving.set(true);
-    this.transactionsApi.create(dto).subscribe({
+    const operation = this.editMode() && this.transactionId()
+      ? this.transactionsApi.update(this.transactionId()!, dto)
+      : this.transactionsApi.create(dto);
+
+    operation.subscribe({
       next: () => {
         this.saving.set(false);
         this.router.navigate(['/transactions']);

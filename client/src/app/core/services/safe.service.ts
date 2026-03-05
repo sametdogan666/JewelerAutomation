@@ -21,6 +21,14 @@ export interface SafeMovementCreate {
   movementType: 0 | 1 | 2 | 3;
 }
 
+export interface SafeStatus {
+  goldBalance: number;
+  cashBalance: number;
+  expectedGold: number;
+  actualGold: number;
+  goldShortage: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class SafeService {
   constructor(private api: ApiService) {}
@@ -35,5 +43,9 @@ export class SafeService {
 
   addMovement(dto: SafeMovementCreate): Observable<SafeMovement> {
     return this.api.post<SafeMovement>('safe/movements', dto);
+  }
+
+  getStatus(): Observable<SafeStatus> {
+    return this.api.get<SafeStatus>('safe/status');
   }
 }

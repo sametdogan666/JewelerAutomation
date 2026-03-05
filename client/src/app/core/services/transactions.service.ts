@@ -52,4 +52,12 @@ export class TransactionsService {
   create(dto: TransactionCreate): Observable<Transaction> {
     return this.api.post<Transaction>('transactions', dto);
   }
+
+  update(id: string, dto: TransactionCreate): Observable<Transaction> {
+    return this.api.put<Transaction>(`transactions/${id}`, dto);
+  }
+
+  delete(id: string): Observable<void> {
+    return this.api.delete<void>(`transactions/${id}`);
+  }
 }

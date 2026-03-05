@@ -13,11 +13,13 @@ public class SafeController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAccountingService _accounting;
+    private readonly ISafeStatusService _safeStatus;
 
-    public SafeController(IUnitOfWork unitOfWork, IAccountingService accounting)
+    public SafeController(IUnitOfWork unitOfWork, IAccountingService accounting, ISafeStatusService safeStatus)
     {
         _unitOfWork = unitOfWork;
         _accounting = accounting;
+        _safeStatus = safeStatus;
     }
 
     [HttpGet("balance")]
@@ -27,10 +29,13 @@ public class SafeController : ControllerBase
         return Ok(balance);
     }
 
+    /// <summary>
+    /// Sadece manuel eklenen kasa hareketlerini döndür (alış-satıştan otomatik oluşanlar gösterilmez).
+    /// </summary>
     [HttpGet("movements")]
     public async Task<ActionResult<IReadOnlyList<SafeMovement>>> GetMovements(CancellationToken cancellationToken)
     {
-        var list = await _unitOfWork.SafeMovements.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var list = await _unitOfWork.SafeMovements.GetManualMovementsAsync(cancellationToken).ConfigureAwait(false);
         return Ok(list);
     }
 
@@ -51,6 +56,30 @@ public class SafeController : ControllerBase
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return CreatedAtAction(nameof(GetMovements), null, entity);
     }
+
+    /// <summary>
+    /// Kasa durumu: Altın bakiyesi, nakit bakiyesi ve altın açığı.
+    /// </summary>
+    [HttpGet("status")]
+    public async Task<ActionResult<SafeStatusDto>> GetStatus(CancellationToken cancellationToken)
+    {
+        var status = await _safeStatus.GetSafeStatusAsync(cancellationToken).ConfigureAwait(false);
+        return Ok(new SafeStatusDto(
+            status.GoldBalance,
+            status.CashBalance,
+            status.ExpectedGold,
+            status.ActualGold,
+            status.GoldShortage
+        ));
+    }
 }
 
 public record SafeMovementCreateDto(DateTime TransactionDate, decimal Gram, decimal Milyem, string? Description, SafeMovementType MovementType);
+
+public record SafeStatusDto(
+    decimal GoldBalance,
+    decimal CashBalance,
+    decimal ExpectedGold,
+    decimal ActualGold,
+    decimal GoldShortage
+);

@@ -10,23 +10,41 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
   const snackBar = inject(MatSnackBar);
 
-  const token = auth.getToken();
-  if (token) {
-    req = req.clone({
-      setHeaders: { Authorization: `Bearer ${token}` },
-    });
+  // #region agent log
+  console.log('[INTERCEPTOR] Request intercepted', {url: req.url, urlWithParams: req.urlWithParams, method: req.method});
+  // #endregion
+
+  const url = req.url || req.urlWithParams || '';
+  const isLoginRequest = url.includes('/auth/login');
+
+  // #region agent log
+  console.log('[INTERCEPTOR] isLoginRequest check', {url, isLoginRequest});
+  // #endregion
+
+  // Login isteğine token ekleme; diğerlerine ekle
+  if (!isLoginRequest) {
+    const token = auth.getToken(); // doğrudan localStorage okur
+    // #region agent log
+    console.log('[INTERCEPTOR] Adding token to request', {url:url, hasToken:!!token, tokenLength:token?.length??0});
+    // #endregion
+    if (token) {
+      req = req.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
+      // #region agent log
+      console.log('[INTERCEPTOR] Token added, Authorization header set');
+      // #endregion
+    }
   }
 
   return next(req).pipe(
     catchError((err: HttpErrorResponse) => {
-      if (err.status === 401 && token) {
-        auth.logout();
-        snackBar.open('Oturumunuz sona erdi. Lütfen tekrar giriş yapın.', 'Kapat', { duration: 5000 });
-        return throwError(() => err);
-      }
-      if (err.status === 401 && !token) {
-        const msg = err.error?.message ?? err.error ?? 'Kullanıcı adı veya şifre hatalı.';
-        snackBar.open(typeof msg === 'string' ? msg : 'Giriş başarısız.', 'Kapat', { duration: 4000 });
+      if (err.status === 401) {
+        if (isLoginRequest) {
+          // Login hatası: form'da gösterilir, interceptor snackbar göstermesin
+        } else {
+          // Korunan endpoint 401: oturumu kapat
+          auth.logout();
+          snackBar.open('Oturumunuz sona erdi. Lütfen tekrar giriş yapın.', 'Kapat', { duration: 5000 });
+        }
         return throwError(() => err);
       }
       if (err.status === 403) {
@@ -34,9 +52,15 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         router.navigate(['/']);
         return throwError(() => err);
       }
-      const message = err.error?.message ?? err.error ?? (typeof err.error === 'string' ? err.error : null);
-      const display = message || (err.status === 0 ? 'Sunucuya ulaşılamıyor.' : `Hata (${err.status}).`);
-      snackBar.open(display, 'Kapat', { duration: 5000 });
+      if (err.status === 0) {
+        snackBar.open('Sunucuya ulaşılamıyor.', 'Kapat', { duration: 5000 });
+        return throwError(() => err);
+      }
+      const message =
+        typeof err.error === 'string'
+          ? err.error
+          : err.error?.message ?? err.error?.title ?? `Hata (${err.status})`;
+      snackBar.open(message, 'Kapat', { duration: 5000 });
       return throwError(() => err);
     })
   );

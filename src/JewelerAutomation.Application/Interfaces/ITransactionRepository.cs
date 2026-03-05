@@ -9,4 +9,5 @@ public interface ITransactionRepository
     Task<IReadOnlyList<Transaction>> GetByDateRangeAsync(DateTime from, DateTime to, CancellationToken cancellationToken = default);
     Task<Transaction> AddAsync(Transaction entity, CancellationToken cancellationToken = default);
     void Update(Transaction entity);
+    void Delete(Transaction entity);
 }

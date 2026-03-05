@@ -27,9 +27,11 @@ public class JwtService : IJwtService
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
+        var issuer = _configuration["Jwt:Issuer"] ?? "JewelerAutomation";
+        var audience = _configuration["Jwt:Audience"] ?? "JewelerAutomation";
         var token = new JwtSecurityToken(
-            issuer: _configuration["Jwt:Issuer"],
-            audience: _configuration["Jwt:Audience"],
+            issuer: issuer,
+            audience: audience,
             claims: claims,
             expires: expiry,
             signingCredentials: creds);
@@ -40,6 +42,6 @@ public class JwtService : IJwtService
     private int GetExpiryMinutes()
     {
         var minutes = _configuration["Jwt:ExpiryMinutes"];
-        return int.TryParse(minutes, out var m) ? m : 60;
+        return int.TryParse(minutes, out var m) && m > 0 ? m : 480; // varsayılan 8 saat
     }
 }

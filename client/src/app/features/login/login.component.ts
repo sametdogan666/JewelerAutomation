@@ -33,6 +33,8 @@ export class LoginComponent {
   loading = false;
   error = '';
 
+  // constructor'da token temizleme YOK — bu döngüye neden oluyordu
+
   form = this.fb.nonNullable.group({
     userName: ['', [Validators.required]],
     password: ['', [Validators.required]],
@@ -45,13 +47,24 @@ export class LoginComponent {
     this.auth.login(this.form.getRawValue()).subscribe({
       next: () => {
         this.loading = false;
+        // #region agent log
+        console.log('[LOGIN] Login success, before navigate', {isAuthNow:this.auth.isAuthenticated(), timestamp:new Date().toISOString()});
+        // #endregion
+        // Token zaten localStorage'da; guard doğrudan okur
         const returnUrl = this.route.snapshot.queryParams['returnUrl'] ?? '/';
+        console.log('[LOGIN] Navigating to:', returnUrl);
         this.router.navigateByUrl(returnUrl);
       },
       error: (err) => {
         this.loading = false;
-        const msg = err.error;
-        this.error = typeof msg === 'string' ? msg : (err.error?.message ?? (err.status === 401 ? 'Kullanıcı adı veya şifre hatalı.' : 'Bağlantı hatası.'));
+        const body = err.error;
+        if (err.status === 401) {
+          this.error = 'Kullanıcı adı veya şifre hatalı.';
+        } else if (err.status === 0) {
+          this.error = 'Sunucuya bağlanılamıyor. API çalışıyor mu?';
+        } else {
+          this.error = typeof body === 'string' ? body : (body?.message ?? `Hata (${err.status}).`);
+        }
       },
     });
   }

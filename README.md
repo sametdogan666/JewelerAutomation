@@ -68,6 +68,8 @@ cd src/JewelerAutomation.WebAPI
 dotnet run
 ```
 
+> **Build hatası:** `dotnet build` sırasında "file is locked" (MSB3027/MSB3021) görürseniz, çalışan API'yi kapatıp tekrar deneyin. Veya `.\scripts\build.ps1` çalıştırın; script WebAPI process'ini durdurup build alır.
+
 API adresi: **https://localhost:7177**
 
 **2. Frontend (Angular)**
@@ -83,7 +85,7 @@ Tarayıcıda **http://localhost:4200** açılır.
 **3. Giriş**
 
 - Kullanıcı adı: **admin**  
-- Şifre: **Admin123!**
+- Şifre: **122333**
 
 Girişten sonra Panel’de özet kartlar, **Cariler** menüsünde 6 örnek cari, **Kasa** menüsünde bakiye ve örnek hareketler listelenir.
 

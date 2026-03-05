@@ -4,28 +4,90 @@
     <p class="page-subtitle">Özet bilgiler ve hızlı erişim</p>
   </div>
 
+  <!-- SafeStatus Widget -->
+  <div class="widget-section">
+    <app-safe-status-widget></app-safe-status-widget>
+  </div>
+
   <div class="stats-grid">
-    <mat-card class="stat-card stat-card--balance">
+    <!-- Net Capital Cards -->
+    <mat-card class="stat-card stat-card--net-capital">
       <mat-card-content>
         <div class="stat-icon">
-          <mat-icon>account_balance_wallet</mat-icon>
+          <mat-icon>trending_up</mat-icon>
         </div>
         <div class="stat-body">
           <span class="stat-value">
-            @if (balance() !== null) {
-              {{ balance()! | number:'1.2-4' }} <small>Has Gr</small>
+            @if (capitalSummary() !== null) {
+              {{ capitalSummary()!.netGoldCapital | number:'1.2-4' }} <small>Has Gr</small>
             } @else if (loading()) {
               <span class="stat-skeleton">—</span>
             } @else {
               —
             }
           </span>
-          <span class="stat-label">Kasa bakiyesi</span>
+          <span class="stat-label">Net Sermaye (Altın)</span>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="stat-card stat-card--gold-safe">
+      <mat-card-content>
+        <div class="stat-icon">
+          <mat-icon>account_balance_wallet</mat-icon>
+        </div>
+        <div class="stat-body">
+          <span class="stat-value">
+            @if (capitalSummary() !== null) {
+              {{ capitalSummary()!.totalGoldInSafe | number:'1.2-4' }} <small>Has Gr</small>
+            } @else if (loading()) {
+              <span class="stat-skeleton">—</span>
+            } @else {
+              —
+            }
+          </span>
+          <span class="stat-label">Kasadaki Altın</span>
         </div>
       </mat-card-content>
       <mat-card-actions>
         <a mat-button color="primary" routerLink="/kasa">Kasa detayı</a>
       </mat-card-actions>
+    </mat-card>
+
+    <mat-card class="stat-card stat-card--debt">
+      <mat-card-content>
+        <div class="stat-icon">
+          <mat-icon>arrow_upward</mat-icon>
+        </div>
+        <div class="stat-body">
+          <span class="stat-value stat-value--small">
+            @if (capitalSummary() !== null) {
+              {{ capitalSummary()!.totalCustomerGoldDebt | number:'1.2-4' }} <small>Has Gr</small>
+            } @else {
+              —
+            }
+          </span>
+          <span class="stat-label">Müşterilere Borç</span>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="stat-card stat-card--receivable">
+      <mat-card-content>
+        <div class="stat-icon">
+          <mat-icon>arrow_downward</mat-icon>
+        </div>
+        <div class="stat-body">
+          <span class="stat-value stat-value--small">
+            @if (capitalSummary() !== null) {
+              {{ capitalSummary()!.totalCustomerGoldReceivable | number:'1.2-4' }} <small>Has Gr</small>
+            } @else {
+              —
+            }
+          </span>
+          <span class="stat-label">Müşterilerden Alacak</span>
+        </div>
+      </mat-card-content>
     </mat-card>
 
     <mat-card class="stat-card stat-card--customers">
