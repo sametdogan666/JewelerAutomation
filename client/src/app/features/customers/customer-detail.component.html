@@ -1,0 +1,149 @@
+<div class="detail-page">
+  @if (loading()) {
+    <div class="loading-wrap">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Yükleniyor…</p>
+    </div>
+  } @else {
+    <div class="page-header">
+      <a mat-button routerLink="/customers" class="back-link">
+        <mat-icon>arrow_back</mat-icon>
+        Cariler
+      </a>
+      <div class="header-row">
+        <div>
+          <h1 class="page-title">{{ customer()?.name }}</h1>
+          <p class="page-meta">
+            {{ customer()?.phone ?? '—' }} · {{ customer()?.type === 0 ? 'Cari' : 'Şahıs' }}
+          </p>
+        </div>
+        <a mat-flat-button color="primary" [routerLink]="['/customers', customerId(), 'edit']">
+          <mat-icon>edit</mat-icon>
+          Düzenle
+        </a>
+      </div>
+    </div>
+
+    <!-- Balance cards -->
+    <div class="balance-cards">
+      <mat-card class="balance-card balance-card--gold">
+        <mat-card-content>
+          <mat-icon class="balance-icon">account_balance_wallet</mat-icon>
+          <div class="balance-body">
+            <span class="balance-value">{{ balance()?.goldBalance ?? 0 | number:'1.2-4' }} <small>Has Gr</small></span>
+            <span class="balance-label">Altın bakiyesi</span>
+          </div>
+        </mat-card-content>
+      </mat-card>
+      <mat-card class="balance-card balance-card--cash">
+        <mat-card-content>
+          <mat-icon class="balance-icon">payments</mat-icon>
+          <div class="balance-body">
+            <span class="balance-value">{{ balance()?.cashBalance ?? 0 | number:'1.2-2' }} <small>TL</small></span>
+            <span class="balance-label">Nakit bakiye</span>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    </div>
+
+    <!-- Add transaction -->
+    <mat-card class="section-card">
+      <mat-card-header>
+        <mat-card-title>Cari hareket ekle</mat-card-title>
+        <button mat-button (click)="toggleTransactionForm()">
+          {{ showTransactionForm() ? 'İptal' : 'Yeni hareket' }}
+        </button>
+      </mat-card-header>
+      @if (showTransactionForm()) {
+        <mat-card-content>
+          <form [formGroup]="form" (ngSubmit)="onSubmitTransaction()" class="transaction-form">
+            <div class="form-row">
+              <mat-form-field appearance="outline">
+                <mat-label>Tarih</mat-label>
+                <input matInput type="date" formControlName="transactionDate" />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>İşlem türü</mat-label>
+                <mat-select formControlName="transactionType">
+                  @for (opt of transactionTypes; track opt.value) {
+                    <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+            @if (isGoldTransaction) {
+              <div class="form-row">
+                <mat-form-field appearance="outline">
+                  <mat-label>Gram</mat-label>
+                  <input matInput type="number" formControlName="goldGram" step="0.001" min="0" />
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Milyem</mat-label>
+                  <input matInput type="number" formControlName="goldMilyem" min="0" max="1000" />
+                </mat-form-field>
+              </div>
+            }
+            @if (isCashTransaction) {
+              <div class="form-row">
+                <mat-form-field appearance="outline">
+                  <mat-label>Tutar (TL)</mat-label>
+                  <input matInput type="number" formControlName="cashAmount" step="0.01" />
+                </mat-form-field>
+              </div>
+            }
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Açıklama</mat-label>
+              <input matInput formControlName="description" />
+            </mat-form-field>
+            <div class="form-actions">
+              <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+                {{ saving() ? 'Kaydediliyor…' : 'Kaydet' }}
+              </button>
+            </div>
+          </form>
+        </mat-card-content>
+      }
+    </mat-card>
+
+    <!-- Statement -->
+    <mat-card class="section-card">
+      <mat-card-header>
+        <mat-card-title>Hesap ekstresi</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        @if (dataSource.data.length === 0) {
+          <p class="empty-text">Henüz hareket yok.</p>
+        } @else {
+          <table mat-table [dataSource]="dataSource" class="statement-table">
+            <ng-container matColumnDef="transactionDate">
+              <th mat-header-cell *matHeaderCellDef>Tarih</th>
+              <td mat-cell *matCellDef="let row">{{ formatDate(row.transactionDate) }}</td>
+            </ng-container>
+            <ng-container matColumnDef="transactionType">
+              <th mat-header-cell *matHeaderCellDef>Tür</th>
+              <td mat-cell *matCellDef="let row">
+                <span class="badge" [class.badge-gold-purchase]="row.transactionType === 0" [class.badge-gold-sale]="row.transactionType === 1" [class.badge-cash-payment]="row.transactionType === 2" [class.badge-cash-collection]="row.transactionType === 3">
+                  {{ transactionTypeLabel(row.transactionType) }}
+                </span>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="goldHas">
+              <th mat-header-cell *matHeaderCellDef>Has Gr</th>
+              <td mat-cell *matCellDef="let row">{{ row.goldHas | number:'1.2-4' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="cashAmount">
+              <th mat-header-cell *matHeaderCellDef>Tutar (TL)</th>
+              <td mat-cell *matCellDef="let row">{{ row.cashAmount | number:'1.2-2' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="description">
+              <th mat-header-cell *matHeaderCellDef>Açıklama</th>
+              <td mat-cell *matCellDef="let row">{{ row.description || '—' }}</td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+          </table>
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

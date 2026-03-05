@@ -1,0 +1,178 @@
+.detail-page {
+  padding: var(--spacing-lg);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.loading-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  gap: var(--spacing-md);
+  color: var(--text-muted);
+}
+
+.page-header {
+  margin-bottom: var(--spacing-xl);
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-secondary);
+  }
+
+  .header-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+  }
+
+  .page-title {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .page-meta {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+}
+
+.balance-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+.balance-card {
+  mat-card-content {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg) !important;
+  }
+
+  .balance-icon {
+    font-size: 2rem;
+    width: 2rem;
+    height: 2rem;
+    color: #fff;
+    padding: 0.5rem;
+    border-radius: var(--radius);
+  }
+
+  .balance-card--gold .balance-icon {
+    background: linear-gradient(135deg, #ed6c02 0%, #ff9800 100%);
+  }
+
+  .balance-card--cash .balance-icon {
+    background: linear-gradient(135deg, #2e7d32 0%, #43a047 100%);
+  }
+
+  .balance-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .balance-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+
+    small {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+  }
+
+  .balance-label {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+}
+
+.section-card {
+  margin-bottom: var(--spacing-lg);
+
+  mat-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md) var(--spacing-lg) 0 !important;
+  }
+
+  mat-card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  mat-card-content {
+    padding: var(--spacing-lg) !important;
+  }
+}
+
+.transaction-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  max-width: 600px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.full-width {
+  width: 100%;
+}
+
+.form-actions {
+  margin-top: var(--spacing-sm);
+}
+
+.empty-text {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+}
+
+.statement-table {
+  width: 100%;
+
+  th {
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-secondary);
+    background: #fafbfc;
+  }
+
+  .badge {
+    display: inline-flex;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .badge-gold-purchase { background: #e8f5e9; color: #2e7d32; }
+  .badge-gold-sale { background: #fff3e0; color: #e65100; }
+  .badge-cash-payment { background: #e3f2fd; color: #1565c0; }
+  .badge-cash-collection { background: #fce4ec; color: #c2185b; }
+}

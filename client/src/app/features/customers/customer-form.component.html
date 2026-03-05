@@ -1,0 +1,52 @@
+<div class="content-wrap">
+  <div class="page-header">
+    <h1 class="page-title">{{ isEdit() ? 'Cari düzenle' : 'Yeni cari' }}</h1>
+    <a mat-button routerLink="/customers">
+      <mat-icon>arrow_back</mat-icon>
+      Listeye dön
+    </a>
+  </div>
+
+  @if (loading()) {
+    <mat-card>
+      <mat-card-content class="loading-row">Yükleniyor…</mat-card-content>
+    </mat-card>
+  } @else {
+    <mat-card>
+      <mat-card-content>
+        <form [formGroup]="form" (ngSubmit)="onSubmit()" class="form-fields">
+          <mat-form-field appearance="outline">
+            <mat-label>Ad / Unvan</mat-label>
+            <input matInput formControlName="name" />
+            <mat-error>Ad gerekli</mat-error>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Tür</mat-label>
+            <mat-select formControlName="type">
+              <mat-option [value]="0">Cari</mat-option>
+              <mat-option [value]="1">Şahıs</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Telefon</mat-label>
+            <input matInput formControlName="phone" type="tel" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Adres</mat-label>
+            <textarea matInput formControlName="address" rows="2"></textarea>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Açıklama</mat-label>
+            <textarea matInput formControlName="description" rows="2"></textarea>
+          </mat-form-field>
+          <div class="form-actions">
+            <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+              {{ isEdit() ? 'Güncelle' : 'Kaydet' }}
+            </button>
+            <a mat-button routerLink="/customers">İptal</a>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

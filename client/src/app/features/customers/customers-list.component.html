@@ -1,0 +1,61 @@
+<div class="content-wrap customers-page">
+  <div class="page-header">
+    <div class="page-title-block">
+      <h1 class="page-title">Cariler</h1>
+      <p class="page-subtitle">Cari ve şahıs hesaplarını yönetin</p>
+    </div>
+    <a mat-flat-button color="primary" routerLink="/customers/new">
+      <mat-icon>add</mat-icon>
+      Yeni cari
+    </a>
+  </div>
+
+  <mat-card>
+    @if (loading()) {
+      <mat-card-content class="loading-row">
+        <p>Yükleniyor…</p>
+      </mat-card-content>
+    } @else {
+      <table mat-table [dataSource]="dataSource" class="customers-table">
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>Ad / Unvan</th>
+          <td mat-cell *matCellDef="let row">{{ row.name }}</td>
+        </ng-container>
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef>Tür</th>
+          <td mat-cell *matCellDef="let row">
+            <mat-chip [class.chip-cari]="row.type === 0" [class.chip-sahis]="row.type === 1">
+              {{ typeLabel(row.type) }}
+            </mat-chip>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="phone">
+          <th mat-header-cell *matHeaderCellDef>Telefon</th>
+          <td mat-cell *matCellDef="let row">{{ row.phone || '—' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let row">
+            <a mat-icon-button [routerLink]="['/customers', row.id]" (click)="$event.stopPropagation()" aria-label="Detay">
+              <mat-icon>visibility</mat-icon>
+            </a>
+            <a mat-icon-button [routerLink]="['/customers', row.id, 'edit']" (click)="$event.stopPropagation()" aria-label="Düzenle">
+              <mat-icon>edit</mat-icon>
+            </a>
+            <button mat-icon-button (click)="delete(row, $event); $event.stopPropagation()" aria-label="Sil">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns" [routerLink]="['/customers', row.id]" class="row-link"></tr>
+      </table>
+      @if (dataSource.data.length === 0 && !loading()) {
+        <mat-card-content class="empty-state">
+          <mat-icon>people_outline</mat-icon>
+          <p>Henüz cari kaydı yok. Yeni cari eklemek için "Yeni cari" butonunu kullanın.</p>
+        </mat-card-content>
+      }
+    }
+  </mat-card>
+</div>

@@ -1,0 +1,64 @@
+.customers-page .page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+
+  .page-title { margin: 0 0 0.25rem 0; font-size: 1.375rem; font-weight: 600; color: var(--text-primary); }
+  .page-subtitle { margin: 0; font-size: 0.875rem; color: var(--text-secondary); }
+}
+
+.loading-row, .empty-state {
+  padding: 2rem !important;
+  text-align: center;
+  color: #64748b;
+}
+
+.empty-state {
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+  }
+}
+
+.customers-table {
+  width: 100%;
+
+  .row-link {
+    cursor: pointer;
+    &:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+  }
+
+  th {
+    font-weight: 600;
+    color: #475569;
+  }
+
+  .mat-mdc-chip {
+    font-size: 0.8125rem;
+  }
+
+  .chip-cari {
+    background: #e0e7ff;
+    color: #4338ca;
+  }
+
+  .chip-sahis {
+    background: #d1fae5;
+    color: #047857;
+  }
+}
+
+@media (max-width: 599px) {
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

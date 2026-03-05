@@ -1,0 +1,37 @@
+<div class="login-page">
+  <mat-card class="login-card">
+    <mat-card-header>
+      <div class="brand-wrap">
+        <span class="brand-icon">◆</span>
+        <div>
+          <mat-card-title>DOĞAN KUYUMCULUK</mat-card-title>
+          <mat-card-subtitle>Yönetim paneline giriş yapın</mat-card-subtitle>
+        </div>
+      </div>
+    </mat-card-header>
+    <mat-card-content>
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="login-form">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Kullanıcı adı</mat-label>
+          <input matInput formControlName="userName" autocomplete="username" />
+          <mat-error>Kullanıcı adı gerekli</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Şifre</mat-label>
+          <input matInput type="password" formControlName="password" autocomplete="current-password" />
+          <mat-error>Şifre gerekli</mat-error>
+        </mat-form-field>
+        @if (error) {
+          <p class="error-msg">{{ error }}</p>
+        }
+        <button mat-flat-button color="primary" type="submit" class="submit-btn" [disabled]="loading">
+          @if (loading) {
+            <mat-spinner diameter="24"></mat-spinner>
+          } @else {
+            Giriş yap
+          }
+        </button>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div>

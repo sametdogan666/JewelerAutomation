@@ -1,0 +1,76 @@
+<div class="dashboard-page">
+  <div class="page-header">
+    <h1 class="page-title">Panel</h1>
+    <p class="page-subtitle">Özet bilgiler ve hızlı erişim</p>
+  </div>
+
+  <div class="stats-grid">
+    <mat-card class="stat-card stat-card--balance">
+      <mat-card-content>
+        <div class="stat-icon">
+          <mat-icon>account_balance_wallet</mat-icon>
+        </div>
+        <div class="stat-body">
+          <span class="stat-value">
+            @if (balance() !== null) {
+              {{ balance()! | number:'1.2-4' }} <small>Has Gr</small>
+            } @else if (loading()) {
+              <span class="stat-skeleton">—</span>
+            } @else {
+              —
+            }
+          </span>
+          <span class="stat-label">Kasa bakiyesi</span>
+        </div>
+      </mat-card-content>
+      <mat-card-actions>
+        <a mat-button color="primary" routerLink="/kasa">Kasa detayı</a>
+      </mat-card-actions>
+    </mat-card>
+
+    <mat-card class="stat-card stat-card--customers">
+      <mat-card-content>
+        <div class="stat-icon">
+          <mat-icon>people</mat-icon>
+        </div>
+        <div class="stat-body">
+          <span class="stat-value">
+            @if (customerCount() !== null) {
+              {{ customerCount() }}
+            } @else if (loading()) {
+              <span class="stat-skeleton">—</span>
+            } @else {
+              —
+            }
+          </span>
+          <span class="stat-label">Cari / Şahıs</span>
+        </div>
+      </mat-card-content>
+      <mat-card-actions>
+        <a mat-button color="primary" routerLink="/customers">Carileri yönet</a>
+      </mat-card-actions>
+    </mat-card>
+
+    <mat-card class="stat-card stat-card--actions">
+      <mat-card-content>
+        <div class="stat-icon">
+          <mat-icon>swap_horiz</mat-icon>
+        </div>
+        <div class="stat-body">
+          <span class="stat-label">Alış / Satış</span>
+          <span class="stat-value stat-value--small">İşlem kaydı</span>
+        </div>
+      </mat-card-content>
+      <mat-card-actions>
+        <a mat-button color="primary" routerLink="/transactions/new">Yeni işlem</a>
+      </mat-card-actions>
+    </mat-card>
+  </div>
+
+  <mat-card class="welcome-card">
+    <mat-card-content>
+      <h2 class="welcome-title">Hoş geldiniz</h2>
+      <p class="welcome-text">DOĞAN KUYUMCULUK yönetim panelinde kasa hareketleri, cari hesaplar ve alış-satış işlemlerinizi yönetebilirsiniz. Sol menüden ilgili sayfaya gidebilirsiniz.</p>
+    </mat-card-content>
+  </mat-card>
+</div>

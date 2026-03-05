@@ -1,0 +1,49 @@
+# Backend (.NET)
+[Dd]ebug/
+[Rr]elease/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+.vs/
+*.rsuser
+project.lock.json
+project.fragment.lock.json
+artifacts/
+appsettings.Development.json
+appsettings.*.local.json
+*.db
+*.db-shm
+*.db-wal
+
+# Frontend (Angular / Node)
+node_modules/
+client/node_modules/
+client/dist/
+client/tmp/
+client/out-tsc/
+client/.angular/
+client/coverage/
+npm-debug.log*
+yarn-error.log*
+
+# IDEs
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env / secrets (do not commit real credentials)
+.env
+.env.local
+*.local

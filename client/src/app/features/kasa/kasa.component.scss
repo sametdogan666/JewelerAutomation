@@ -1,0 +1,85 @@
+.kasa-page .page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+
+  .page-title { margin: 0 0 0.25rem 0; font-size: 1.375rem; font-weight: 600; color: var(--text-primary); }
+  .page-subtitle { margin: 0; font-size: 0.875rem; color: var(--text-secondary); }
+}
+
+.balance-card {
+  margin-bottom: 1.5rem;
+
+  mat-card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 1.5rem !important;
+  }
+
+  .balance-label {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+
+  .balance-value {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: var(--text-primary);
+
+    small {
+      font-size: 0.9375rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+  }
+}
+
+.form-card {
+  margin-bottom: 1.5rem;
+}
+
+.kasa-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+  align-items: start;
+
+  .full-width {
+    grid-column: 1 / -1;
+  }
+
+  .form-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 0.75rem;
+  }
+}
+
+.loading-row, .empty-state {
+  padding: 2rem !important;
+  text-align: center;
+  color: #64748b;
+}
+
+.empty-state mat-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 0.5rem;
+  opacity: 0.5;
+}
+
+.kasa-table {
+  width: 100%;
+}
+
+@media (max-width: 599px) {
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

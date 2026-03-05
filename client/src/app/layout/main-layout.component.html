@@ -1,0 +1,64 @@
+<mat-sidenav-container class="layout-container">
+  <mat-sidenav
+    #drawer
+    [opened]="drawerOpened()"
+    [mode]="drawerMode()"
+    class="sidebar"
+  >
+    <div class="sidebar-header">
+      <div class="logo-wrap">
+        <span class="logo-icon">◆</span>
+        <span class="logo-text">DOĞAN<br>KUYUMCULUK</span>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      @for (item of navItems; track item.path) {
+        <a
+          class="nav-item"
+          [routerLink]="item.path"
+          routerLinkActive="nav-item--active"
+          [routerLinkActiveOptions]="{ exact: item.path === '/dashboard' }"
+          (click)="closeDrawerIfHandset()"
+        >
+          <mat-icon class="nav-icon">{{ item.icon }}</mat-icon>
+          <span class="nav-label">{{ item.label }}</span>
+        </a>
+      }
+    </nav>
+    <div class="sidebar-footer">
+      <span class="sidebar-version">Yönetim Paneli</span>
+    </div>
+  </mat-sidenav>
+
+  <mat-sidenav-content class="main-content">
+    <header class="topbar">
+      <button mat-icon-button class="topbar-toggle" (click)="toggleDrawer()" aria-label="Menü">
+        <mat-icon>menu</mat-icon>
+      </button>
+      <div class="topbar-brand">
+        <span class="topbar-title">DOĞAN KUYUMCULUK</span>
+        <span class="topbar-subtitle">Altın & Kuyumculuk Yönetimi</span>
+      </div>
+      <div class="topbar-spacer"></div>
+      <div class="topbar-user">
+        <button mat-button [matMenuTriggerFor]="userMenu" class="user-btn">
+          <span class="user-avatar">
+            <mat-icon>person</mat-icon>
+          </span>
+          <span class="user-name">{{ currentUser()?.userName ?? 'Kullanıcı' }}</span>
+          <mat-icon class="user-chevron">expand_more</mat-icon>
+        </button>
+        <mat-menu #userMenu="matMenu" class="user-menu">
+          <button mat-menu-item (click)="logout()">
+            <mat-icon>logout</mat-icon>
+            <span>Çıkış yap</span>
+          </button>
+        </mat-menu>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <router-outlet />
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

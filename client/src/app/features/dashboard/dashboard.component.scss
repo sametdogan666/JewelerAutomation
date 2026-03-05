@@ -1,0 +1,127 @@
+.dashboard-page {
+  padding: var(--spacing-lg);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-header {
+  margin-bottom: var(--spacing-xl);
+
+  .page-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
+  }
+
+  .page-subtitle {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin: 0.35rem 0 0 0;
+  }
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+}
+
+.stat-card {
+  mat-card-content {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-lg) !important;
+  }
+
+  .stat-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    mat-icon {
+      font-size: 1.75rem;
+      width: 1.75rem;
+      height: 1.75rem;
+      color: #fff;
+    }
+  }
+
+  .stat-card--balance .stat-icon {
+    background: linear-gradient(135deg, #3949ab 0%, #5c6bc0 100%);
+  }
+
+  .stat-card--customers .stat-icon {
+    background: linear-gradient(135deg, #00695c 0%, #00897b 100%);
+  }
+
+  .stat-card--actions .stat-icon {
+    background: linear-gradient(135deg, #ed6c02 0%, #ff9800 100%);
+  }
+
+  .stat-body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .stat-value {
+    display: block;
+    font-size: 1.375rem;
+    font-weight: 600;
+    color: var(--text-primary);
+
+    small {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-left: 0.25rem;
+    }
+
+    &.stat-value--small {
+      font-size: 0.9375rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+  }
+
+  .stat-label {
+    display: block;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+  }
+
+  .stat-skeleton {
+    opacity: 0.6;
+  }
+
+  mat-card-actions {
+    padding: 0 var(--spacing-lg) var(--spacing-md);
+  }
+}
+
+.welcome-card {
+  mat-card-content {
+    padding: var(--spacing-xl) !important;
+  }
+
+  .welcome-title {
+    margin: 0 0 var(--spacing-sm) 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .welcome-text {
+    margin: 0;
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+}

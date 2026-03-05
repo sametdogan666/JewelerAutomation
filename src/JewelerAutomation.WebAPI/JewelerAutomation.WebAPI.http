@@ -1,0 +1,6 @@
+@JewelerAutomation.WebAPI_HostAddress = http://localhost:5145
+
+GET {{JewelerAutomation.WebAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
