@@ -16,5 +16,7 @@ public record CapitalSummary(
     decimal TotalCashInSafe,
     decimal TotalCustomerGoldDebt,
     decimal TotalCustomerGoldReceivable,
+    decimal TotalPersonalGoldDebt,
+    decimal TotalPersonalGoldReceivable,
     decimal NetGoldCapital
 );

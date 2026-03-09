@@ -83,6 +83,58 @@ public class CustomerAccountController : ControllerBase
 
         return CreatedAtAction(nameof(GetCustomerStatement), new { customerId }, new CustomerTransactionDto(entity.Id, entity.TransactionDate, entity.TransactionType, entity.GoldGram, entity.GoldMilyem, entity.GoldHas, entity.CashAmount, entity.Description));
     }
+
+    /// <summary>
+    /// Delete a customer transaction.
+    /// </summary>
+    [HttpDelete("/api/customer-transactions/{id:guid}")]
+    public async Task<ActionResult> DeleteTransaction(Guid id, CancellationToken cancellationToken)
+    {
+        var transaction = await _unitOfWork.CustomerTransactions.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
+        if (transaction == null) return NotFound();
+
+        _unitOfWork.CustomerTransactions.Delete(transaction);
+        await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Update a customer transaction.
+    /// </summary>
+    [HttpPut("/api/customer-transactions/{id:guid}")]
+    public async Task<ActionResult<CustomerTransactionDto>> UpdateTransaction(
+        Guid id,
+        [FromBody] CreateCustomerTransactionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var transaction = await _unitOfWork.CustomerTransactions.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
+        if (transaction == null) return NotFound();
+
+        transaction.TransactionDate = request.TransactionDate;
+        transaction.TransactionType = request.TransactionType;
+        transaction.GoldGram = request.GoldGram;
+        transaction.GoldMilyem = request.GoldMilyem;
+        transaction.GoldHas = request.GoldGram * (request.GoldMilyem / 1000m);
+        transaction.CashAmount = request.CashAmount;
+        transaction.Description = request.Description;
+
+        _unitOfWork.CustomerTransactions.Update(transaction);
+        await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        var dto = new CustomerTransactionDto(
+            transaction.Id,
+            transaction.TransactionDate,
+            transaction.TransactionType,
+            transaction.GoldGram,
+            transaction.GoldMilyem,
+            transaction.GoldHas,
+            transaction.CashAmount,
+            transaction.Description
+        );
+
+        return Ok(dto);
+    }
 }
 
 public record CustomerBalanceDto(Guid CustomerId, string CustomerName, decimal GoldBalance, decimal CashBalance);

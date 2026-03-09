@@ -58,6 +58,6 @@ export class TransactionsService {
   }
 
   delete(id: string): Observable<void> {
-    return this.api.delete<void>(`transactions/${id}`);
+    return this.api.delete(`transactions/${id}`);
   }
 }

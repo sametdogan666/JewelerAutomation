@@ -303,6 +303,122 @@
   padding: var(--spacing-md) 0;
 }
 
+/* Summary Card */
+.summary-card {
+  margin-bottom: var(--spacing-lg);
+  border: 2px solid var(--primary);
+
+  mat-card-header {
+    padding: var(--spacing-md) var(--spacing-lg) !important;
+    background: linear-gradient(135deg, var(--primary-light), var(--primary));
+    color: white;
+  }
+
+  .summary-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+  }
+
+  .summary-icon {
+    font-size: 2rem;
+    width: 2rem;
+    height: 2rem;
+    color: white;
+  }
+
+  mat-card-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: white !important;
+    margin: 0;
+  }
+
+  mat-card-subtitle {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.8) !important;
+    margin: 0.15rem 0 0 0;
+  }
+
+  mat-card-content {
+    padding: var(--spacing-lg) !important;
+  }
+}
+
+.summary-section {
+  margin-bottom: var(--spacing-md);
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.summary-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  margin-bottom: var(--spacing-sm);
+}
+
+.summary-date {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+.summary-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: var(--spacing-md) 0;
+}
+
+.summary-section-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0;
+  font-size: 0.875rem;
+
+  .summary-label {
+    color: var(--text-secondary);
+  }
+
+  .summary-value {
+    font-weight: 500;
+    color: var(--text-primary);
+
+    &.summary-value--large {
+      font-size: 1.125rem;
+      color: var(--primary);
+    }
+  }
+
+  &.summary-row--negative {
+    .summary-value {
+      color: var(--warning);
+    }
+  }
+
+  &.summary-row--highlight {
+    padding-top: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+    border-top: 2px solid var(--border-color);
+  }
+}
+
 .info-card {
   border-left: 4px solid var(--info);
 

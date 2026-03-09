@@ -9,6 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { DecimalPipe } from '@angular/common';
 import { CustomersService, Customer } from '../../core/services/customers.service';
 import {
@@ -40,6 +41,7 @@ const TRANSACTION_TYPES: { value: CustomerTransactionType; label: string }[] = [
     MatIconModule,
     MatTableModule,
     MatProgressSpinnerModule,
+    MatTooltipModule,
     DecimalPipe,
   ],
   templateUrl: './customer-detail.component.html',
@@ -59,7 +61,8 @@ export class CustomerDetailComponent implements OnInit {
   showTransactionForm = signal(false);
 
   dataSource = new MatTableDataSource<CustomerTransactionDto>([]);
-  displayedColumns = ['transactionDate', 'transactionType', 'goldHas', 'cashAmount', 'description'];
+  displayedColumns = ['transactionDate', 'transactionType', 'goldHas', 'cashAmount', 'description', 'actions'];
+  deleting = signal<string | null>(null);
 
   transactionTypes = TRANSACTION_TYPES;
   customerId = computed(() => this.route.snapshot.paramMap.get('id'));
@@ -151,6 +154,27 @@ export class CustomerDetailComponent implements OnInit {
         this.loadAccount(id);
       },
       error: () => this.saving.set(false),
+    });
+  }
+
+  onDeleteTransaction(transaction: CustomerTransactionDto): void {
+    if (!confirm(`${this.transactionTypeLabel(transaction.transactionType)} işlemini silmek istediğinize emin misiniz?`)) {
+      return;
+    }
+
+    this.deleting.set(transaction.id);
+    this.accountApi.deleteTransaction(transaction.id).subscribe({
+      next: () => {
+        this.deleting.set(null);
+        const customerId = this.customerId();
+        if (customerId) {
+          this.loadAccount(customerId);
+        }
+      },
+      error: () => {
+        this.deleting.set(null);
+        alert('Hareket silinirken bir hata oluştu.');
+      }
     });
   }
 }

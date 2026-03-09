@@ -28,6 +28,8 @@ public class CapitalController : ControllerBase
             summary.TotalCashInSafe,
             summary.TotalCustomerGoldDebt,
             summary.TotalCustomerGoldReceivable,
+            summary.TotalPersonalGoldDebt,
+            summary.TotalPersonalGoldReceivable,
             summary.NetGoldCapital
         ));
     }
@@ -38,5 +40,7 @@ public record CapitalSummaryDto(
     decimal TotalCashInSafe,
     decimal TotalCustomerGoldDebt,
     decimal TotalCustomerGoldReceivable,
+    decimal TotalPersonalGoldDebt,
+    decimal TotalPersonalGoldReceivable,
     decimal NetGoldCapital
 );

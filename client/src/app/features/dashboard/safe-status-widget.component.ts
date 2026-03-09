@@ -1,13 +1,13 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
-import { DecimalPipe, NgIf } from '@angular/common';
+import { DecimalPipe, NgIf, NgClass } from '@angular/common';
 import { SafeService, SafeStatus } from '../../core/services/safe.service';
 
 @Component({
   selector: 'app-safe-status-widget',
   standalone: true,
-  imports: [MatCardModule, MatIconModule, DecimalPipe, NgIf],
+  imports: [MatCardModule, MatIconModule, DecimalPipe, NgIf, NgClass],
   template: `
     <mat-card class="safe-status-card">
       <mat-card-header>
@@ -25,7 +25,7 @@ import { SafeService, SafeStatus } from '../../core/services/safe.service';
               <mat-icon class="status-icon">stars</mat-icon>
               <div class="status-info">
                 <div class="status-label">Kasadaki Altın</div>
-                <div class="status-value">{{ status()!.goldBalance | number:'1.2-4' }} <span class="unit">Has Gr</span></div>
+                <div class="status-value">{{ status()!.goldBalance | number:'1.2-2' }} <span class="unit">Has Gr</span></div>
               </div>
             </div>
 
@@ -38,10 +38,11 @@ import { SafeService, SafeStatus } from '../../core/services/safe.service';
             </div>
 
             <div class="status-item status-item--expected">
-              <mat-icon class="status-icon">trending_up</mat-icon>
+              <mat-icon class="status-icon">sync_alt</mat-icon>
               <div class="status-info">
-                <div class="status-label">Beklenen Altın</div>
-                <div class="status-value">{{ status()!.expectedGold | number:'1.2-4' }} <span class="unit">Has Gr</span></div>
+                <div class="status-label">İşlemlerden Beklenen</div>
+                <div class="status-value">{{ status()!.expectedGold | number:'1.2-2' }} <span class="unit">Has Gr</span></div>
+                <div class="status-hint">Alış-Satış net etkisi</div>
               </div>
             </div>
 
@@ -49,7 +50,7 @@ import { SafeService, SafeStatus } from '../../core/services/safe.service';
               <mat-icon class="status-icon">{{ shortageIcon() }}</mat-icon>
               <div class="status-info">
                 <div class="status-label">Altın Açığı / Fazlası</div>
-                <div class="status-value">{{ status()!.goldShortage | number:'1.2-4' }} <span class="unit">Has Gr</span></div>
+                <div class="status-value">{{ status()!.goldShortage | number:'1.2-2' }} <span class="unit">Has Gr</span></div>
                 @if (hasShortage()) {
                   <div class="shortage-warning">
                     <mat-icon class="warning-icon">warning</mat-icon>
@@ -166,6 +167,13 @@ import { SafeService, SafeStatus } from '../../core/services/safe.service';
       text-transform: uppercase;
       letter-spacing: 0.5px;
       font-weight: 500;
+    }
+
+    .status-hint {
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.6);
+      margin-top: 0.25rem;
+      font-style: italic;
     }
 
     .status-value {

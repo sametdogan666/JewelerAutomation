@@ -14,6 +14,7 @@ public class AppDbContext : DbContext
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<SafeMovement> SafeMovements => Set<SafeMovement>();
     public DbSet<Inventory> Inventories => Set<Inventory>();
+    public DbSet<CashPeggingLog> CashPeggingLogs => Set<CashPeggingLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -83,6 +84,20 @@ public class AppDbContext : DbContext
             e.Property(x => x.TotalQuantity).HasPrecision(precision, scale);
             e.Property(x => x.Milyem).HasPrecision(precision, scale);
             e.Property(x => x.TotalHasGram).HasPrecision(precision, scale);
+        });
+
+        modelBuilder.Entity<CashPeggingLog>(e =>
+        {
+            e.Property(x => x.CashAmount).HasPrecision(precision, scale);
+            e.Property(x => x.GoldPricePerGram).HasPrecision(precision, scale);
+            e.Property(x => x.EquivalentHasGram).HasPrecision(precision, scale);
+            e.Property(x => x.PhysicalGoldAtTime).HasPrecision(precision, scale);
+            e.Property(x => x.TotalCapitalHasGram).HasPrecision(precision, scale);
+            e.Property(x => x.TransactionProfitHasGram).HasPrecision(precision, scale);
+            e.Property(x => x.ExchangeRateProfitHasGram).HasPrecision(precision, scale);
+            e.Property(x => x.NetProfitHasGram).HasPrecision(precision, scale);
+            e.Property(x => x.Notes).HasMaxLength(1024);
+            e.HasIndex(x => x.PeggingDate);
         });
     }
 }

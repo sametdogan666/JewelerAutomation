@@ -1,6 +1,6 @@
 .dashboard-page {
   padding: var(--spacing-lg);
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
 }
 
@@ -8,136 +8,328 @@
   margin-bottom: var(--spacing-xl);
 
   .page-title {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin: 0;
+    margin: 0 0 0.35rem 0;
+    font-size: 1.875rem;
+    font-weight: 700;
     color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+
+    mat-icon {
+      font-size: 2.25rem;
+      width: 2.25rem;
+      height: 2.25rem;
+      color: #7b1fa2;
+    }
   }
 
   .page-subtitle {
-    font-size: 0.875rem;
+    margin: 0;
+    font-size: 1rem;
     color: var(--text-secondary);
-    margin: 0.35rem 0 0 0;
+    font-weight: 500;
   }
 }
 
-.widget-section {
-  margin-bottom: var(--spacing-xl);
-}
-
-.stats-grid {
+.main-widgets-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--spacing-lg);
-  margin-bottom: var(--spacing-xl);
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+
+  @media (max-width: 1400px) {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
 }
 
-.stat-card {
+// Capital Widget (Mor tema)
+.capital-widget {
+  background: linear-gradient(135deg, #5f72bd 0%, #9921e8 100%);
+  color: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(95, 114, 189, 0.3);
+
+  mat-card-header {
+    padding: 1.5rem 1.5rem 0 1.5rem;
+  }
+
   mat-card-content {
+    padding: 1.5rem !important;
+  }
+
+  .widget-header {
     display: flex;
     align-items: center;
-    gap: var(--spacing-lg);
-    padding: var(--spacing-lg) !important;
+    gap: 1rem;
   }
 
-  .stat-icon {
-    width: 52px;
-    height: 52px;
-    border-radius: var(--radius);
+  .widget-icon {
+    font-size: 2.5rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .widget-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: white;
+  }
+
+  .widget-subtitle {
+    margin: 0.25rem 0 0 0;
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .capital-grid {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .capital-main {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .capital-main-icon {
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
 
     mat-icon {
-      font-size: 1.75rem;
-      width: 1.75rem;
-      height: 1.75rem;
-      color: #fff;
+      font-size: 2rem;
+      width: 2rem;
+      height: 2rem;
+      color: white;
     }
   }
 
-  .stat-card--net-capital .stat-icon {
-    background: linear-gradient(135deg, #6a1b9a 0%, #9c27b0 100%);
-  }
-
-  .stat-card--gold-safe .stat-icon {
-    background: linear-gradient(135deg, #3949ab 0%, #5c6bc0 100%);
-  }
-
-  .stat-card--debt .stat-icon {
-    background: linear-gradient(135deg, #c62828 0%, #f44336 100%);
-  }
-
-  .stat-card--receivable .stat-icon {
-    background: linear-gradient(135deg, #00838f 0%, #00bcd4 100%);
-  }
-
-  .stat-card--customers .stat-icon {
-    background: linear-gradient(135deg, #00695c 0%, #00897b 100%);
-  }
-
-  .stat-card--actions .stat-icon {
-    background: linear-gradient(135deg, #ed6c02 0%, #ff9800 100%);
-  }
-
-  .stat-body {
+  .capital-main-content {
     flex: 1;
-    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
-  .stat-value {
-    display: block;
-    font-size: 1.375rem;
-    font-weight: 600;
-    color: var(--text-primary);
+  .capital-main-label {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.8);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 500;
+  }
+
+  .capital-main-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: white;
 
     small {
-      font-size: 0.8125rem;
+      font-size: 1rem;
       font-weight: 500;
-      color: var(--text-muted);
-      margin-left: 0.25rem;
-    }
-
-    &.stat-value--small {
-      font-size: 0.9375rem;
-      font-weight: 500;
-      color: var(--text-secondary);
+      color: rgba(255, 255, 255, 0.7);
+      margin-left: 0.5rem;
     }
   }
 
-  .stat-label {
-    display: block;
-    font-size: 0.8125rem;
-    color: var(--text-muted);
-    margin-top: 0.2rem;
+  .capital-details {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+
+    @media (max-width: 900px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    @media (max-width: 600px) {
+      grid-template-columns: 1fr;
+    }
   }
 
-  .stat-skeleton {
-    opacity: 0.6;
+  .capital-item {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateY(-2px);
+    }
   }
 
-  mat-card-actions {
-    padding: 0 var(--spacing-lg) var(--spacing-md);
+  .item-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+
+    &.gold {
+      background: linear-gradient(135deg, #ffa000 0%, #ffc107 100%);
+      color: white;
+    }
+
+    &.debt {
+      background: linear-gradient(135deg, #c62828 0%, #f44336 100%);
+      color: white;
+    }
+
+    &.receivable {
+      background: linear-gradient(135deg, #00838f 0%, #00bcd4 100%);
+      color: white;
+    }
+
+    &.personal-debt {
+      background: linear-gradient(135deg, #d32f2f 0%, #e57373 100%);
+      color: white;
+    }
+
+    &.personal-receivable {
+      background: linear-gradient(135deg, #0097a7 0%, #26c6da 100%);
+      color: white;
+    }
+  }
+
+  .item-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .item-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .item-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: white;
+  }
+
+  .loading-state {
+    text-align: center;
+    padding: 2rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1rem;
   }
 }
 
-.welcome-card {
+// Quick Actions Widget (Mor tema)
+.quick-actions-widget {
+  background: linear-gradient(135deg, #4a148c 0%, #7b1fa2 100%);
+  color: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(74, 20, 140, 0.3);
+
+  mat-card-header {
+    padding: 1.5rem 1.5rem 0 1.5rem;
+  }
+
   mat-card-content {
-    padding: var(--spacing-xl) !important;
+    padding: 1.5rem !important;
   }
 
-  .welcome-title {
-    margin: 0 0 var(--spacing-sm) 0;
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--text-primary);
+  .widget-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
   }
 
-  .welcome-text {
+  .widget-icon {
+    font-size: 2.5rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .widget-title {
     margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: white;
+  }
+
+  .actions-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-top: 0.5rem;
+
+    @media (max-width: 600px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1.5rem 1rem;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    color: white;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    font-weight: 500;
     font-size: 0.9375rem;
-    color: var(--text-secondary);
-    line-height: 1.6;
+
+    mat-icon {
+      font-size: 2rem;
+      width: 2rem;
+      height: 2rem;
+    }
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.25);
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    &--transaction {
+      border-left: 4px solid #ff9800;
+    }
+
+    &--customer {
+      border-left: 4px solid #2196f3;
+    }
+
+    &--safe {
+      border-left: 4px solid #4caf50;
+    }
+
+    &--list {
+      border-left: 4px solid #9c27b0;
+    }
   }
 }

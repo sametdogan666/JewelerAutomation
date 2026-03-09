@@ -15,7 +15,8 @@ public class UnitOfWork : IUnitOfWork
         ISafeMovementRepository safeMovements,
         IInventoryRepository inventories,
         ICustomerMovementRepository customerMovements,
-        ICustomerTransactionRepository customerTransactions)
+        ICustomerTransactionRepository customerTransactions,
+        ICashPeggingLogRepository cashPeggingLogs)
     {
         _context = context;
         Users = users;
@@ -25,6 +26,7 @@ public class UnitOfWork : IUnitOfWork
         Inventories = inventories;
         CustomerMovements = customerMovements;
         CustomerTransactions = customerTransactions;
+        CashPeggingLogs = cashPeggingLogs;
     }
 
     public IUserRepository Users { get; }
@@ -34,6 +36,7 @@ public class UnitOfWork : IUnitOfWork
     public IInventoryRepository Inventories { get; }
     public ICustomerMovementRepository CustomerMovements { get; }
     public ICustomerTransactionRepository CustomerTransactions { get; }
+    public ICashPeggingLogRepository CashPeggingLogs { get; }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         => _context.SaveChangesAsync(cancellationToken);

@@ -9,5 +9,6 @@ public interface IUnitOfWork : IDisposable
     IInventoryRepository Inventories { get; }
     ICustomerMovementRepository CustomerMovements { get; }
     ICustomerTransactionRepository CustomerTransactions { get; }
+    ICashPeggingLogRepository CashPeggingLogs { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

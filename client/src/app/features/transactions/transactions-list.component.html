@@ -1,7 +1,10 @@
 <div class="list-page">
   <div class="page-header">
     <div class="page-title-block">
-      <h1 class="page-title">Alış-Satış</h1>
+      <h1 class="page-title">
+        <mat-icon class="page-icon">shopping_cart</mat-icon>
+        Alış-Satış İşlemleri
+      </h1>
       <p class="page-subtitle">Satış ve alış işlemlerinizi listeleyin. Her işlem kasayı otomatik günceller.</p>
     </div>
     <a mat-flat-button color="primary" routerLink="/transactions/new" class="btn-primary">
@@ -9,6 +12,53 @@
       Yeni işlem
     </a>
   </div>
+
+  <!-- Date Filter -->
+  <mat-card class="filter-card">
+    <mat-card-content>
+      <div class="filter-row">
+        <mat-form-field class="filter-select">
+          <mat-label>Tarih Filtresi</mat-label>
+          <mat-select [formControl]="dateFilterType">
+            <mat-option value="all">Tüm İşlemler</mat-option>
+            <mat-option value="today">Bugünkü İşlemler</mat-option>
+            <mat-option value="week">Son 7 Gün</mat-option>
+            <mat-option value="custom">Özel Tarih Aralığı</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        @if (dateFilterType.value === 'custom') {
+          <div class="custom-date-range" [formGroup]="dateRangeForm">
+            <mat-form-field class="date-field">
+              <mat-label>Başlangıç Tarihi</mat-label>
+              <input matInput [matDatepicker]="startPicker" formControlName="startDate">
+              <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
+              <mat-datepicker #startPicker></mat-datepicker>
+            </mat-form-field>
+
+            <mat-form-field class="date-field">
+              <mat-label>Bitiş Tarihi</mat-label>
+              <input matInput [matDatepicker]="endPicker" formControlName="endDate">
+              <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
+              <mat-datepicker #endPicker></mat-datepicker>
+            </mat-form-field>
+
+            <div class="date-actions">
+              <button mat-raised-button color="primary" (click)="applyCustomDateRange()" 
+                      [disabled]="!dateRangeForm.value.startDate || !dateRangeForm.value.endDate">
+                <mat-icon>check</mat-icon>
+                Uygula
+              </button>
+              <button mat-button (click)="clearCustomDateRange()">
+                <mat-icon>clear</mat-icon>
+                Temizle
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    </mat-card-content>
+  </mat-card>
 
   <mat-card class="table-card">
     @if (loading()) {
@@ -18,55 +68,98 @@
       </mat-card-content>
     } @else {
       <table mat-table [dataSource]="dataSource" class="data-table">
+        <!-- Tarih -->
         <ng-container matColumnDef="transactionDate">
           <th mat-header-cell *matHeaderCellDef>Tarih</th>
           <td mat-cell *matCellDef="let row">{{ formatDate(row.transactionDate) }}</td>
         </ng-container>
+
+        <!-- Tür (Alış/Satış) -->
         <ng-container matColumnDef="direction">
           <th mat-header-cell *matHeaderCellDef>Tür</th>
           <td mat-cell *matCellDef="let row">
-            <span class="badge" [class.badge-sale]="row.direction === 0" [class.badge-purchase]="row.direction === 1">
+            <span class="badge" [ngClass]="{
+              'badge-sale': row.direction === 0,
+              'badge-purchase': row.direction === 1
+            }">
               {{ directionLabel(row.direction) }}
             </span>
           </td>
         </ng-container>
+
+        <!-- Miktar -->
         <ng-container matColumnDef="quantity">
           <th mat-header-cell *matHeaderCellDef>Miktar (gr)</th>
-          <td mat-cell *matCellDef="let row">{{ row.quantity | number:'1.2-4' }}</td>
+          <td mat-cell *matCellDef="let row">{{ row.quantity | number:'1.2-2' }}</td>
         </ng-container>
+
+        <!-- Milyem -->
         <ng-container matColumnDef="milyem">
           <th mat-header-cell *matHeaderCellDef>Milyem</th>
           <td mat-cell *matCellDef="let row">{{ row.milyem }}</td>
         </ng-container>
+
+        <!-- Has Gram -->
         <ng-container matColumnDef="hasGram">
           <th mat-header-cell *matHeaderCellDef>Has Gr</th>
-          <td mat-cell *matCellDef="let row">{{ row.hasGram | number:'1.2-4' }}</td>
+          <td mat-cell *matCellDef="let row">{{ row.hasGram | number:'1.2-2' }}</td>
         </ng-container>
+
+        <!-- Fiyat -->
         <ng-container matColumnDef="price">
-          <th mat-header-cell *matHeaderCellDef>Fiyat</th>
-          <td mat-cell *matCellDef="let row">{{ row.price != null ? (row.price | number:'1.2-0') : '—' }}</td>
+          <th mat-header-cell *matHeaderCellDef>Fiyat (TL)</th>
+          <td mat-cell *matCellDef="let row">
+            @if (row.price != null && row.price > 0) {
+              {{ row.price | number:'1.0-0' }} ₺
+            } @else {
+              <span class="text-muted">—</span>
+            }
+          </td>
         </ng-container>
+
+        <!-- Cari -->
         <ng-container matColumnDef="customer">
           <th mat-header-cell *matHeaderCellDef>Cari</th>
           <td mat-cell *matCellDef="let row">{{ row.customer?.name ?? '—' }}</td>
         </ng-container>
+
+        <!-- Açıklama -->
         <ng-container matColumnDef="description">
           <th mat-header-cell *matHeaderCellDef>Açıklama</th>
           <td mat-cell *matCellDef="let row">{{ row.description || '—' }}</td>
         </ng-container>
+
+        <!-- İşlemler (Edit/Delete) -->
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef class="actions-header">İşlemler</th>
           <td mat-cell *matCellDef="let row" class="actions-cell">
-            <button mat-icon-button color="primary" [routerLink]="['/transactions', row.id, 'edit']" matTooltip="Düzenle">
+            <button 
+              mat-icon-button 
+              color="primary" 
+              [routerLink]="['/transactions', row.id, 'edit']" 
+              matTooltip="Düzenle"
+              type="button">
               <mat-icon>edit</mat-icon>
             </button>
-            <button mat-icon-button color="warn" (click)="onDelete(row)" [disabled]="deleting() === row.id" matTooltip="Sil">
-              <mat-icon>delete</mat-icon>
+            <button 
+              mat-icon-button 
+              color="warn" 
+              (click)="onDelete(row)" 
+              [disabled]="deleting() === row.id" 
+              matTooltip="Sil"
+              type="button">
+              @if (deleting() === row.id) {
+                <mat-icon>hourglass_empty</mat-icon>
+              } @else {
+                <mat-icon>delete</mat-icon>
+              }
             </button>
           </td>
         </ng-container>
-        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+
+        <!-- Header & Row Definitions -->
+        <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns" class="table-row"></tr>
       </table>
       @if (dataSource.data.length === 0 && !loading()) {
         <mat-card-content class="empty-state">

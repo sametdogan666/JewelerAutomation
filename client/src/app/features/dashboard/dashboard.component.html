@@ -1,138 +1,127 @@
 <div class="dashboard-page">
   <div class="page-header">
-    <h1 class="page-title">Panel</h1>
-    <p class="page-subtitle">Özet bilgiler ve hızlı erişim</p>
+    <h1 class="page-title">
+      <mat-icon>dashboard</mat-icon>
+      Panel
+    </h1>
+    <p class="page-subtitle">DOĞAN KUYUMCULUK - Anlık durum ve finans analizi</p>
   </div>
 
-  <!-- SafeStatus Widget -->
-  <div class="widget-section">
+  <!-- Main Widgets Grid (4 Widget) -->
+  <div class="main-widgets-grid">
+    <!-- Kasa Durumu Widget -->
     <app-safe-status-widget></app-safe-status-widget>
-  </div>
-
-  <div class="stats-grid">
-    <!-- Net Capital Cards -->
-    <mat-card class="stat-card stat-card--net-capital">
+    
+    <!-- Kar Analizi Widget -->
+    <app-profit-widget></app-profit-widget>
+    
+    <!-- Sermaye & Hesaplar Widget -->
+    <mat-card class="capital-widget">
+      <mat-card-header>
+        <div class="widget-header">
+          <mat-icon class="widget-icon">account_balance</mat-icon>
+          <div>
+            <h2 class="widget-title">Sermaye & Hesaplar</h2>
+            <p class="widget-subtitle">Net sermaye ve cari/şahıs bakiyeleri</p>
+          </div>
+        </div>
+      </mat-card-header>
       <mat-card-content>
-        <div class="stat-icon">
-          <mat-icon>trending_up</mat-icon>
-        </div>
-        <div class="stat-body">
-          <span class="stat-value">
-            @if (capitalSummary() !== null) {
-              {{ capitalSummary()!.netGoldCapital | number:'1.2-4' }} <small>Has Gr</small>
-            } @else if (loading()) {
-              <span class="stat-skeleton">—</span>
-            } @else {
-              —
-            }
-          </span>
-          <span class="stat-label">Net Sermaye (Altın)</span>
-        </div>
+        @if (loading()) {
+          <div class="loading-state">Yükleniyor...</div>
+        } @else if (capitalSummary()) {
+          <div class="capital-grid">
+            <!-- Net Sermaye - Büyük -->
+            <div class="capital-main">
+              <div class="capital-main-icon">
+                <mat-icon>trending_up</mat-icon>
+              </div>
+              <div class="capital-main-content">
+                <span class="capital-main-label">Net Sermaye</span>
+                <span class="capital-main-value">{{ capitalSummary()!.netGoldCapital | number:'1.2-2' }} <small>Has Gr</small></span>
+              </div>
+            </div>
+
+            <!-- Detay Kartları -->
+            <div class="capital-details">
+              <!-- Kasadaki Altın -->
+              <div class="capital-item">
+                <mat-icon class="item-icon gold">stars</mat-icon>
+                <div class="item-content">
+                  <span class="item-label">Kasadaki Altın</span>
+                  <span class="item-value">{{ capitalSummary()!.totalGoldInSafe | number:'1.2-2' }} Has Gr</span>
+                </div>
+              </div>
+
+              <!-- Cari Borç -->
+              <div class="capital-item">
+                <mat-icon class="item-icon debt">business</mat-icon>
+                <div class="item-content">
+                  <span class="item-label">Carilere Borç</span>
+                  <span class="item-value">{{ capitalSummary()!.totalCustomerGoldDebt | number:'1.2-2' }} Has Gr</span>
+                </div>
+              </div>
+
+              <!-- Cari Alacak -->
+              <div class="capital-item">
+                <mat-icon class="item-icon receivable">store</mat-icon>
+                <div class="item-content">
+                  <span class="item-label">Carilerden Alacak</span>
+                  <span class="item-value">{{ capitalSummary()!.totalCustomerGoldReceivable | number:'1.2-2' }} Has Gr</span>
+                </div>
+              </div>
+
+              <!-- Şahıs Borç -->
+              <div class="capital-item">
+                <mat-icon class="item-icon personal-debt">person</mat-icon>
+                <div class="item-content">
+                  <span class="item-label">Şahıslara Borç</span>
+                  <span class="item-value">{{ capitalSummary()!.totalPersonalGoldDebt | number:'1.2-2' }} Has Gr</span>
+                </div>
+              </div>
+
+              <!-- Şahıs Alacak -->
+              <div class="capital-item">
+                <mat-icon class="item-icon personal-receivable">people_alt</mat-icon>
+                <div class="item-content">
+                  <span class="item-label">Şahıslardan Alacak</span>
+                  <span class="item-value">{{ capitalSummary()!.totalPersonalGoldReceivable | number:'1.2-2' }} Has Gr</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
       </mat-card-content>
     </mat-card>
 
-    <mat-card class="stat-card stat-card--gold-safe">
-      <mat-card-content>
-        <div class="stat-icon">
-          <mat-icon>account_balance_wallet</mat-icon>
+    <!-- Hızlı Erişim Widget -->
+    <mat-card class="quick-actions-widget">
+      <mat-card-header>
+        <div class="widget-header">
+          <mat-icon class="widget-icon">flash_on</mat-icon>
+          <h2 class="widget-title">Hızlı Erişim</h2>
         </div>
-        <div class="stat-body">
-          <span class="stat-value">
-            @if (capitalSummary() !== null) {
-              {{ capitalSummary()!.totalGoldInSafe | number:'1.2-4' }} <small>Has Gr</small>
-            } @else if (loading()) {
-              <span class="stat-skeleton">—</span>
-            } @else {
-              —
-            }
-          </span>
-          <span class="stat-label">Kasadaki Altın</span>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="actions-grid">
+          <a mat-raised-button routerLink="/transactions/new" class="action-btn action-btn--transaction">
+            <mat-icon>add_shopping_cart</mat-icon>
+            <span>Yeni İşlem</span>
+          </a>
+          <a mat-raised-button routerLink="/customers/new" class="action-btn action-btn--customer">
+            <mat-icon>person_add</mat-icon>
+            <span>Yeni Cari</span>
+          </a>
+          <a mat-raised-button routerLink="/kasa" class="action-btn action-btn--safe">
+            <mat-icon>account_balance_wallet</mat-icon>
+            <span>Kasa Detayı</span>
+          </a>
+          <a mat-raised-button routerLink="/customers" class="action-btn action-btn--list">
+            <mat-icon>people</mat-icon>
+            <span>Cariler ({{ customerCount() || 0 }})</span>
+          </a>
         </div>
       </mat-card-content>
-      <mat-card-actions>
-        <a mat-button color="primary" routerLink="/kasa">Kasa detayı</a>
-      </mat-card-actions>
-    </mat-card>
-
-    <mat-card class="stat-card stat-card--debt">
-      <mat-card-content>
-        <div class="stat-icon">
-          <mat-icon>arrow_upward</mat-icon>
-        </div>
-        <div class="stat-body">
-          <span class="stat-value stat-value--small">
-            @if (capitalSummary() !== null) {
-              {{ capitalSummary()!.totalCustomerGoldDebt | number:'1.2-4' }} <small>Has Gr</small>
-            } @else {
-              —
-            }
-          </span>
-          <span class="stat-label">Müşterilere Borç</span>
-        </div>
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card class="stat-card stat-card--receivable">
-      <mat-card-content>
-        <div class="stat-icon">
-          <mat-icon>arrow_downward</mat-icon>
-        </div>
-        <div class="stat-body">
-          <span class="stat-value stat-value--small">
-            @if (capitalSummary() !== null) {
-              {{ capitalSummary()!.totalCustomerGoldReceivable | number:'1.2-4' }} <small>Has Gr</small>
-            } @else {
-              —
-            }
-          </span>
-          <span class="stat-label">Müşterilerden Alacak</span>
-        </div>
-      </mat-card-content>
-    </mat-card>
-
-    <mat-card class="stat-card stat-card--customers">
-      <mat-card-content>
-        <div class="stat-icon">
-          <mat-icon>people</mat-icon>
-        </div>
-        <div class="stat-body">
-          <span class="stat-value">
-            @if (customerCount() !== null) {
-              {{ customerCount() }}
-            } @else if (loading()) {
-              <span class="stat-skeleton">—</span>
-            } @else {
-              —
-            }
-          </span>
-          <span class="stat-label">Cari / Şahıs</span>
-        </div>
-      </mat-card-content>
-      <mat-card-actions>
-        <a mat-button color="primary" routerLink="/customers">Carileri yönet</a>
-      </mat-card-actions>
-    </mat-card>
-
-    <mat-card class="stat-card stat-card--actions">
-      <mat-card-content>
-        <div class="stat-icon">
-          <mat-icon>swap_horiz</mat-icon>
-        </div>
-        <div class="stat-body">
-          <span class="stat-label">Alış / Satış</span>
-          <span class="stat-value stat-value--small">İşlem kaydı</span>
-        </div>
-      </mat-card-content>
-      <mat-card-actions>
-        <a mat-button color="primary" routerLink="/transactions/new">Yeni işlem</a>
-      </mat-card-actions>
     </mat-card>
   </div>
-
-  <mat-card class="welcome-card">
-    <mat-card-content>
-      <h2 class="welcome-title">Hoş geldiniz</h2>
-      <p class="welcome-text">DOĞAN KUYUMCULUK yönetim panelinde kasa hareketleri, cari hesaplar ve alış-satış işlemlerinizi yönetebilirsiniz. Sol menüden ilgili sayfaya gidebilirsiniz.</p>
-    </mat-card-content>
-  </mat-card>
 </div>

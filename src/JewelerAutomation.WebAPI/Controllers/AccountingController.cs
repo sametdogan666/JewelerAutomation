@@ -11,50 +11,80 @@ public class AccountingController : ControllerBase
 {
     private readonly IAccountingService _accountingService;
 
-    public AccountingController(IAccountingService accountingService) => _accountingService = accountingService;
-
-    /// <summary>
-    /// Has Gram (sade): Miktar * Milyem / 1000. Excel: Kasa D, Alış O, Cari GR-HAS.
-    /// </summary>
-    [HttpPost("has-gram")]
-    public ActionResult<decimal> CalculateHasGram([FromBody] HasGramRequest request)
+    public AccountingController(IAccountingService accountingService)
     {
-        var result = _accountingService.CalculateHasGram(request.Quantity, request.Milyem);
-        return Ok(result);
+        _accountingService = accountingService;
     }
 
     /// <summary>
-    /// Has Gram (işçilik dahil): (Miktar * Milyem / 1000) + Toplamİşçilik. Excel: SATIŞ G.
+    /// Kuyumculuk kar/zarar hesaplama (Nakit Bağlama Mantığı).
+    /// Kullanıcı has fiyatını girer, sistem net sermaye ve karı hesaplar.
     /// </summary>
-    [HttpPost("has-gram-with-labour")]
-    public ActionResult<decimal> CalculateHasGramWithLabour([FromBody] HasGramWithLabourRequest request)
+    /// <param name="goldPrice">Has fiyatı (TL/gram)</param>
+    /// <param name="startDate">Başlangıç tarihi (opsiyonel, filtreleme için)</param>
+    /// <param name="endDate">Bitiş tarihi (opsiyonel, filtreleme için)</param>
+    [HttpGet("profit")]
+    public async Task<ActionResult<AccountingProfitDto>> CalculateProfit(
+        [FromQuery] decimal goldPrice,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null,
+        CancellationToken cancellationToken = default)
     {
-        var result = _accountingService.CalculateHasGramWithLabour(request.Quantity, request.Milyem, request.TotalLabour);
-        return Ok(result);
+        if (goldPrice <= 0)
+        {
+            return BadRequest(new { error = "Gold price must be greater than 0." });
+        }
+
+        var result = await _accountingService.CalculateProfitAsync(goldPrice, startDate, endDate, cancellationToken);
+        
+        return Ok(new AccountingProfitDto(
+            result.InitialCapitalHasGram,
+            result.CurrentGoldInSafeHasGram,
+            result.CurrentCashBalanceTL,
+            result.CashEquivalentHasGram,
+            result.NetCapitalHasGram,
+            result.NetProfitHasGram,
+            result.GoldPriceUsed
+        ));
     }
 
     /// <summary>
-    /// Toplam İşçilik: ±(Adet * Birimİşçilik * 0.01). Excel: F.
+    /// İlk Ana Sermaye hareketini döndürür (başlangıç sermayesi).
     /// </summary>
-    [HttpPost("total-labour")]
-    public ActionResult<decimal> CalculateTotalLabour([FromBody] TotalLabourRequest request)
+    [HttpGet("initial-capital")]
+    public async Task<ActionResult<decimal>> GetInitialCapital(CancellationToken cancellationToken)
     {
-        var result = _accountingService.CalculateTotalLabour(request.PieceCount, request.UnitLabour, request.Subtract);
-        return Ok(result);
+        var capital = await _accountingService.GetInitialCapitalAsync(cancellationToken);
+        return Ok(capital);
     }
 
     /// <summary>
-    /// Milyem İşçilik (916 üstü): (Milyem - 916) * Miktar * 0.001. Excel: J.
+    /// Transaction'lardan hesaplanan nakit bakiyesini döndürür.
     /// </summary>
-    [HttpPost("milyem-labour")]
-    public ActionResult<decimal> CalculateMilyemLabour([FromBody] MilyemLabourRequest request)
+    [HttpGet("cash-balance")]
+    public async Task<ActionResult<CashBalanceDto>> GetCashBalance(CancellationToken cancellationToken)
     {
-        var result = _accountingService.CalculateMilyemLabour(request.Quantity, request.Milyem, request.OnlyWhenAlindi);
-        return Ok(result);
+        var result = await _accountingService.GetCashBalanceAsync(cancellationToken);
+        return Ok(new CashBalanceDto(
+            result.TotalSalesCash,
+            result.TotalPurchasesCash,
+            result.NetCashBalance
+        ));
     }
 }
 
-public record HasGramRequest(decimal Quantity, decimal Milyem);
-public record HasGramWithLabourRequest(decimal Quantity, decimal Milyem, decimal TotalLabour);
-public record TotalLabourRequest(int PieceCount, decimal UnitLabour, bool Subtract = true);
-public record MilyemLabourRequest(decimal Quantity, decimal Milyem, bool OnlyWhenAlindi = false);
+public record AccountingProfitDto(
+    decimal InitialCapitalHasGram,
+    decimal CurrentGoldInSafeHasGram,
+    decimal CurrentCashBalanceTL,
+    decimal CashEquivalentHasGram,
+    decimal NetCapitalHasGram,
+    decimal NetProfitHasGram,
+    decimal GoldPriceUsed
+);
+
+public record CashBalanceDto(
+    decimal TotalSalesCash,
+    decimal TotalPurchasesCash,
+    decimal NetCashBalance
+);

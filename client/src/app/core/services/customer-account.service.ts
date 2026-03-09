@@ -52,4 +52,12 @@ export class CustomerAccountService {
   createTransaction(customerId: string, dto: CreateCustomerTransactionRequest): Observable<CustomerTransactionDto> {
     return this.api.post<CustomerTransactionDto>(`customers/${customerId}/account/transactions`, dto);
   }
+
+  deleteTransaction(transactionId: string): Observable<void> {
+    return this.api.delete(`/customer-transactions/${transactionId}`);
+  }
+
+  updateTransaction(transactionId: string, dto: CreateCustomerTransactionRequest): Observable<CustomerTransactionDto> {
+    return this.api.put<CustomerTransactionDto>(`/customer-transactions/${transactionId}`, dto);
+  }
 }

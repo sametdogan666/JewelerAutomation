@@ -8,6 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { SafeService, SafeMovement, SafeMovementCreate } from '../../core/services/safe.service';
 import { NgIf, DecimalPipe } from '@angular/common';
@@ -48,9 +49,10 @@ export class KasaComponent implements OnInit {
   loading = signal(true);
   saving = signal(false);
   showForm = signal(false);
+  deleting = signal<string | null>(null);
   movementTypes = MOVEMENT_TYPES;
 
-  displayedColumns = ['transactionDate', 'gram', 'milyem', 'hasGram', 'movementType', 'description'];
+  displayedColumns = ['transactionDate', 'gram', 'milyem', 'hasGram', 'movementType', 'description', 'actions'];
 
   form = this.fb.nonNullable.group({
     transactionDate: [new Date().toISOString().slice(0, 10), Validators.required],
@@ -125,5 +127,24 @@ export class KasaComponent implements OnInit {
 
   formatDate(s: string): string {
     return new Date(s).toLocaleDateString('tr-TR');
+  }
+
+  onDelete(movement: SafeMovement): void {
+    if (!confirm(`${this.movementTypeLabel(movement.movementType)} hareketini silmek istediğinize emin misiniz?`)) {
+      return;
+    }
+
+    this.deleting.set(movement.id);
+    this.api.deleteMovement(movement.id).subscribe({
+      next: () => {
+        this.deleting.set(null);
+        this.refresh();
+      },
+      error: (err) => {
+        this.deleting.set(null);
+        const errorMsg = err?.error?.message || err?.error || 'Hareket silinirken bir hata oluştu.';
+        alert(errorMsg);
+      }
+    });
   }
 }

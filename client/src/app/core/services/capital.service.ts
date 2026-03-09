@@ -7,6 +7,8 @@ export interface CapitalSummary {
   totalCashInSafe: number;
   totalCustomerGoldDebt: number;
   totalCustomerGoldReceivable: number;
+  totalPersonalGoldDebt: number;
+  totalPersonalGoldReceivable: number;
   netGoldCapital: number;
 }
 

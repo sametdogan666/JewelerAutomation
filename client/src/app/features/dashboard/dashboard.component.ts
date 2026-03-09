@@ -8,11 +8,12 @@ import { SafeService } from '../../core/services/safe.service';
 import { CustomersService } from '../../core/services/customers.service';
 import { CapitalService, CapitalSummary } from '../../core/services/capital.service';
 import { SafeStatusWidgetComponent } from './safe-status-widget.component';
+import { ProfitWidgetComponent } from './profit-widget.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [DecimalPipe, MatCardModule, MatIconModule, MatButtonModule, RouterLink, SafeStatusWidgetComponent],
+  imports: [DecimalPipe, MatCardModule, MatIconModule, MatButtonModule, RouterLink, SafeStatusWidgetComponent, ProfitWidgetComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })

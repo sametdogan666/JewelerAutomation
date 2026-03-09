@@ -27,11 +27,14 @@ builder.Services.AddScoped<ISafeMovementRepository, SafeMovementRepository>();
 builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
 builder.Services.AddScoped<ICustomerMovementRepository, CustomerMovementRepository>();
 builder.Services.AddScoped<ICustomerTransactionRepository, CustomerTransactionRepository>();
+builder.Services.AddScoped<ICashPeggingLogRepository, CashPeggingLogRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 builder.Services.AddScoped<IAccountingService, AccountingService>();
+builder.Services.AddScoped<ICashPeggingService, CashPeggingService>();
 builder.Services.AddScoped<ICapitalCalculationService, CapitalCalculationService>();
 builder.Services.AddScoped<ISafeStatusService, SafeStatusService>();
+builder.Services.AddScoped<IProfitCalculationService, ProfitCalculationService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 
 // JWT
@@ -65,7 +68,12 @@ builder.Services.AddCors(options =>
             .AllowCredentials();
     });
 });
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.WriteIndented = false;
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

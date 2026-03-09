@@ -35,4 +35,86 @@ public interface IAccountingService
     /// Excel: I = IF(G=0,"BOŞ", IF(B>0,"VERİLDİ","ALINDI"))
     /// </summary>
     Core.Entities.MovementDirection GetMovementDirection(decimal quantity, decimal hasGram);
+    
+    /// <summary>
+    /// Kuyumculuk Kar/Zarar hesaplama (Nakit Bağlama Mantığı).
+    /// Formula: Net Sermaye = (Kasadaki Nakit / Has Fiyatı) + Kasadaki Altın
+    ///          Net Kar = Net Sermaye - Başlangıç Sermayesi
+    /// </summary>
+    Task<AccountingProfitResult> CalculateProfitAsync(
+        decimal goldPricePerGram, 
+        DateTime? startDate = null, 
+        DateTime? endDate = null, 
+        CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// İlk "Ana Sermaye" (Capital) kasa hareketini bulur ve başlangıç sermayesi olarak döndürür.
+    /// </summary>
+    Task<decimal> GetInitialCapitalAsync(CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Transaction'lardan toplam nakit bakiyesini hesaplar (Satış - Alış).
+    /// </summary>
+    Task<CashBalanceResult> GetCashBalanceAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Belirli tarih aralığındaki tüm işlemleri getirir (detaylı analiz için).
+    /// </summary>
+    Task<PeriodTransactionSummary> GetPeriodTransactionSummaryAsync(
+        DateTime periodStart,
+        DateTime periodEnd,
+        CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// Kuyumculuk kar/zarar sonucu (Nakit Bağlama Mantığı)
+/// </summary>
+public record AccountingProfitResult(
+    decimal InitialCapitalHasGram,
+    decimal CurrentGoldInSafeHasGram,
+    decimal CurrentCashBalanceTL,
+    decimal CashEquivalentHasGram,
+    decimal NetCapitalHasGram,
+    decimal NetProfitHasGram,
+    decimal GoldPriceUsed
+);
+
+/// <summary>
+/// Nakit bakiye detayı
+/// </summary>
+public record CashBalanceResult(
+    decimal TotalSalesCash,
+    decimal TotalPurchasesCash,
+    decimal NetCashBalance
+);
+
+/// <summary>
+/// Dönemsel işlem özeti.
+/// </summary>
+public record PeriodTransactionSummary(
+    DateTime PeriodStart,
+    DateTime PeriodEnd,
+    IReadOnlyList<TransactionDetail> Transactions,
+    decimal TotalPurchasesHasGram,
+    decimal TotalSalesHasGram,
+    decimal TotalPurchasesCash,
+    decimal TotalSalesCash,
+    decimal NetCashChange,
+    decimal NetGoldChange
+);
+
+/// <summary>
+/// İşlem detayı (kâr analizi için).
+/// </summary>
+public record TransactionDetail(
+    Guid Id,
+    DateTime Date,
+    string Direction,
+    decimal Quantity,
+    decimal Milyem,
+    decimal HasGram,
+    decimal Price,
+    decimal CashImpact,
+    string? CustomerName,
+    string? Description
+);

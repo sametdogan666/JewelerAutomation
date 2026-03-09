@@ -45,6 +45,14 @@ export class SafeService {
     return this.api.post<SafeMovement>('safe/movements', dto);
   }
 
+  updateMovement(id: string, dto: SafeMovementCreate): Observable<SafeMovement> {
+    return this.api.put<SafeMovement>(`safe/movements/${id}`, dto);
+  }
+
+  deleteMovement(id: string): Observable<void> {
+    return this.api.delete(`safe/movements/${id}`);
+  }
+
   getStatus(): Observable<SafeStatus> {
     return this.api.get<SafeStatus>('safe/status');
   }

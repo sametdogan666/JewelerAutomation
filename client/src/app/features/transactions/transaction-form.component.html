@@ -155,40 +155,128 @@
         </div>
       </div>
 
-      <!-- Sidebar: Live calculation preview -->
+      <!-- Sidebar: Live calculation preview & Summary -->
       <aside class="form-sidebar">
-        <mat-card class="preview-card">
-          <mat-card-header>
-            <mat-card-title>Has Gram önizleme</mat-card-title>
-            <mat-card-subtitle>Kayıt öncesi hesaplama</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content>
-            @if (canShowPreview()) {
-              <div class="preview-row">
-                <span class="preview-label">Miktar × Milyem / 1000</span>
-                <span class="preview-value">{{ hasFromPurity() | number:'1.2-4' }} <small>gr</small></span>
+        <!-- Transaction Summary (Full Preview) -->
+        @if (transactionSummary()) {
+          <mat-card class="summary-card">
+            <mat-card-header>
+              <div class="summary-header">
+                <mat-icon class="summary-icon">receipt_long</mat-icon>
+                <div>
+                  <mat-card-title>İşlem Özeti</mat-card-title>
+                  <mat-card-subtitle>Kaydetmeden önce kontrol edin</mat-card-subtitle>
+                </div>
               </div>
-              @if (isSale && (totalLabourPreview() !== 0)) {
-                <div class="preview-row preview-row--labour">
-                  <span class="preview-label">İşçilik (düşüm)</span>
-                  <span class="preview-value">{{ totalLabourPreview() | number:'1.2-4' }} <small>gr</small></span>
+            </mat-card-header>
+            <mat-card-content>
+              <div class="summary-section">
+                <div class="summary-badge" [class.badge-sale]="transactionSummary()!.direction === 'Satış'" [class.badge-purchase]="transactionSummary()!.direction === 'Alış'">
+                  {{ transactionSummary()!.direction }}
+                </div>
+                <div class="summary-date">{{ transactionSummary()!.date | date:'dd.MM.yyyy' }}</div>
+              </div>
+
+              <div class="summary-divider"></div>
+
+              <!-- Gold Details -->
+              <div class="summary-section">
+                <h3 class="summary-section-title">Altın Detayları</h3>
+                <div class="summary-row">
+                  <span class="summary-label">Miktar</span>
+                  <span class="summary-value">{{ transactionSummary()!.quantity | number:'1.2-2' }} gr</span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-label">Milyem (Saflık)</span>
+                  <span class="summary-value">{{ transactionSummary()!.milyem }}</span>
+                </div>
+                <div class="summary-row">
+                  <span class="summary-label">Has (Saflıktan)</span>
+                  <span class="summary-value">{{ transactionSummary()!.hasFromPurity | number:'1.2-2' }} gr</span>
+                </div>
+                @if (transactionSummary()!.milyemLabour > 0) {
+                  <div class="summary-row">
+                    <span class="summary-label">Milyem İşçilik (>916)</span>
+                    <span class="summary-value">{{ transactionSummary()!.milyemLabour | number:'1.2-2' }} gr</span>
+                  </div>
+                }
+                @if (transactionSummary()!.totalLabour !== 0) {
+                  <div class="summary-row summary-row--negative">
+                    <span class="summary-label">İşçilik Düşümü</span>
+                    <span class="summary-value">{{ transactionSummary()!.totalLabour | number:'1.2-2' }} gr</span>
+                  </div>
+                }
+                <div class="summary-row summary-row--highlight">
+                  <span class="summary-label"><strong>Net Has Gram</strong></span>
+                  <span class="summary-value summary-value--large"><strong>{{ transactionSummary()!.finalHasGram | number:'1.2-2' }} gr</strong></span>
+                </div>
+              </div>
+
+              @if (transactionSummary()!.price > 0) {
+                <div class="summary-divider"></div>
+                <!-- Financial Details -->
+                <div class="summary-section">
+                  <h3 class="summary-section-title">Mali Detaylar</h3>
+                  <div class="summary-row">
+                    <span class="summary-label">Birim Fiyat</span>
+                    <span class="summary-value">{{ transactionSummary()!.price | number:'1.2-2' }} ₺</span>
+                  </div>
+                  @if (transactionSummary()!.totalValue > 0) {
+                    <div class="summary-row summary-row--highlight">
+                      <span class="summary-label"><strong>Toplam Tutar</strong></span>
+                      <span class="summary-value summary-value--large"><strong>{{ transactionSummary()!.totalValue | number:'1.2-2' }} ₺</strong></span>
+                    </div>
+                  }
                 </div>
               }
-              <div class="preview-row preview-row--total">
-                <span class="preview-label">Toplam Has Gram</span>
-                <span class="preview-value preview-value--emph">{{ hasGramPreview() | number:'1.2-4' }} <small>gr</small></span>
-              </div>
-            } @else {
-              <p class="preview-placeholder">Miktar ve milyem girin, canlı hesaplama burada görünecek.</p>
-            }
-          </mat-card-content>
-        </mat-card>
+
+              @if (transactionSummary()!.customer !== 'Belirsiz') {
+                <div class="summary-divider"></div>
+                <div class="summary-section">
+                  <h3 class="summary-section-title">Cari</h3>
+                  <div class="summary-row">
+                    <span class="summary-label">Müşteri</span>
+                    <span class="summary-value">{{ transactionSummary()!.customer }}</span>
+                  </div>
+                </div>
+              }
+            </mat-card-content>
+          </mat-card>
+        } @else {
+          <!-- Compact Preview (when summary not available) -->
+          <mat-card class="preview-card">
+            <mat-card-header>
+              <mat-card-title>Has Gram Önizleme</mat-card-title>
+              <mat-card-subtitle>Canlı hesaplama</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              @if (canShowPreview()) {
+                <div class="preview-row">
+                  <span class="preview-label">Miktar × Milyem / 1000</span>
+                  <span class="preview-value">{{ hasFromPurity() | number:'1.2-2' }} <small>gr</small></span>
+                </div>
+                @if (isSale && (totalLabourPreview() !== 0)) {
+                  <div class="preview-row preview-row--labour">
+                    <span class="preview-label">İşçilik (düşüm)</span>
+                    <span class="preview-value">{{ totalLabourPreview() | number:'1.2-2' }} <small>gr</small></span>
+                  </div>
+                }
+                <div class="preview-row preview-row--total">
+                  <span class="preview-label">Toplam Has Gram</span>
+                  <span class="preview-value preview-value--emph">{{ hasGramPreview() | number:'1.2-2' }} <small>gr</small></span>
+                </div>
+              } @else {
+                <p class="preview-placeholder">Miktar ve milyem girin, canlı hesaplama burada görünecek.</p>
+              }
+            </mat-card-content>
+          </mat-card>
+        }
 
         <mat-card class="info-card">
           <mat-card-content>
             <mat-icon class="info-icon">info</mat-icon>
             <div>
-              <strong>Kasa etkisi:</strong> Satışta kasada altın azalır, alışta artar. İşlem sonrası <a routerLink="/kasa">Kasa</a> sayfasından hareketleri görebilirsiniz.
+              <strong>Kasa etkisi:</strong> {{ isSale ? 'Satışta kasada altın azalır' : 'Alışta kasada altın artar' }}. İşlem sonrası <a routerLink="/kasa">Kasa</a> sayfasından hareketleri görebilirsiniz.
             </div>
           </mat-card-content>
         </mat-card>

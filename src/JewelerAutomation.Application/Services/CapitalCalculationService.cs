@@ -5,9 +5,9 @@ namespace JewelerAutomation.Application.Services;
 /// <summary>
 /// Calculates jewelry store net capital (Net Sermaye):
 /// - Gold in Safe (Kasa)
-/// - Customer gold debts (we owe them)
-/// - Customer gold receivables (they owe us)
-/// Net Gold Capital = Gold in Safe + Receivables - Debts
+/// - Customer gold debts/receivables (Cari - Commercial)
+/// - Personal gold debts/receivables (Şahıs - Personal)
+/// Net Gold Capital = Gold in Safe + All Receivables - All Debts
 /// </summary>
 public class CapitalCalculationService : ICapitalCalculationService
 {
@@ -25,28 +25,51 @@ public class CapitalCalculationService : ICapitalCalculationService
         // Şimdilik 0 döndürüyoruz
         var totalCashInSafe = 0m;
 
-        // 3. Tüm müşterilerin altın bakiyelerini topla
+        // 3. Tüm müşterileri al ve tipine göre grupla
         var customers = await _unitOfWork.Customers.GetAllAsync(cancellationToken);
-        decimal totalDebt = 0; // Pozitif bakiyeler toplamı (biz müşteriye borçluyuz)
-        decimal totalReceivable = 0; // Negatif bakiyeler toplamı (müşteri bize borçlu)
 
-        foreach (var customer in customers)
+        // Cari hesaplar (Commercial - Ticari müşteri/tedarikçi)
+        var commercialCustomers = customers.Where(c => c.Type == Core.Entities.CustomerType.Cari).ToList();
+        decimal totalCommercialDebt = 0;
+        decimal totalCommercialReceivable = 0;
+
+        foreach (var customer in commercialCustomers)
         {
             var (goldBalance, _) = await _unitOfWork.CustomerTransactions.GetBalanceAsync(customer.Id, cancellationToken);
             if (goldBalance > 0)
-                totalDebt += goldBalance; // Müşteriye altın borcumuz
+                totalCommercialDebt += goldBalance; // Müşteriye altın borcumuz
             else if (goldBalance < 0)
-                totalReceivable += Math.Abs(goldBalance); // Müşteriden altın alacağımız
+                totalCommercialReceivable += Math.Abs(goldBalance); // Müşteriden altın alacağımız
         }
 
-        // 4. Net Gold Capital = Kasadaki altın + Alacaklar - Borçlar
-        var netGoldCapital = totalGoldInSafe + totalReceivable - totalDebt;
+        // Şahıs hesaplar (Personal - Arkadaş, aile, özel borç/alacak)
+        var personalCustomers = customers.Where(c => c.Type == Core.Entities.CustomerType.Sahis).ToList();
+        decimal totalPersonalDebt = 0;
+        decimal totalPersonalReceivable = 0;
+
+        foreach (var customer in personalCustomers)
+        {
+            var (goldBalance, _) = await _unitOfWork.CustomerTransactions.GetBalanceAsync(customer.Id, cancellationToken);
+            if (goldBalance > 0)
+                totalPersonalDebt += goldBalance; // Şahsa altın borcumuz
+            else if (goldBalance < 0)
+                totalPersonalReceivable += Math.Abs(goldBalance); // Şahıstan altın alacağımız
+        }
+
+        // 4. Net Gold Capital = GoldInSafe + AllReceivables - AllDebts
+        var netGoldCapital = totalGoldInSafe 
+            + totalCommercialReceivable 
+            + totalPersonalReceivable 
+            - totalCommercialDebt 
+            - totalPersonalDebt;
 
         return new CapitalSummary(
             TotalGoldInSafe: totalGoldInSafe,
             TotalCashInSafe: totalCashInSafe,
-            TotalCustomerGoldDebt: totalDebt,
-            TotalCustomerGoldReceivable: totalReceivable,
+            TotalCustomerGoldDebt: totalCommercialDebt,
+            TotalCustomerGoldReceivable: totalCommercialReceivable,
+            TotalPersonalGoldDebt: totalPersonalDebt,
+            TotalPersonalGoldReceivable: totalPersonalReceivable,
             NetGoldCapital: netGoldCapital
         );
     }

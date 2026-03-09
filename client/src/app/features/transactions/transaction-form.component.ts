@@ -9,7 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, DatePipe } from '@angular/common';
 import { NgxMaskDirective } from 'ngx-mask';
 import { TransactionsService, TransactionCreate, TransactionDirection } from '../../core/services/transactions.service';
 import { CustomersService, Customer } from '../../core/services/customers.service';
@@ -32,6 +32,7 @@ const LABOUR_FACTOR = 0.01;
     MatRadioModule,
     MatProgressSpinnerModule,
     DecimalPipe,
+    DatePipe,
     NgxMaskDirective,
   ],
   templateUrl: './transaction-form.component.html',
@@ -89,12 +90,49 @@ export class TransactionFormComponent implements OnInit {
     return Math.round((base + labour) * 1e6) / 1e6;
   });
 
+  /** Live preview: Total transaction value (quantity * price) */
+  totalTransactionValue = computed(() => {
+    const s = this.formSnapshot();
+    const q = s.quantity ?? 0;
+    const p = s.price ?? 0;
+    if (p === 0 || q === 0) return 0;
+    return Math.round(q * p * 100) / 100;
+  });
+
+  /** Live preview: Milyem labour (only if > 916) */
+  milyemLabourPreview = computed(() => {
+    const s = this.formSnapshot();
+    const m = s.milyem ?? 0;
+    const q = s.quantity ?? 0;
+    if (m <= 916) return 0;
+    return Math.round((m - 916) * q * MILYEM_FACTOR * 1e6) / 1e6;
+  });
+
   /** Whether form has valid numbers for preview */
   canShowPreview = computed(() => {
     const s = this.formSnapshot();
     const q = s.quantity ?? 0;
     const m = s.milyem ?? 0;
     return q > 0 && m >= 0 && m <= 1000;
+  });
+
+  /** Transaction summary data */
+  transactionSummary = computed(() => {
+    if (!this.canShowPreview()) return null;
+    const s = this.formSnapshot();
+    return {
+      direction: s.direction === 0 ? 'Satış' : 'Alış',
+      quantity: s.quantity,
+      milyem: s.milyem,
+      hasFromPurity: this.hasFromPurity(),
+      totalLabour: this.totalLabourPreview(),
+      milyemLabour: this.milyemLabourPreview(),
+      finalHasGram: this.hasGramPreview(),
+      price: s.price ?? 0,
+      totalValue: this.totalTransactionValue(),
+      customer: this.customers().find(c => c.id === s.customerId)?.name ?? 'Belirsiz',
+      date: s.transactionDate,
+    };
   });
 
   ngOnInit(): void {

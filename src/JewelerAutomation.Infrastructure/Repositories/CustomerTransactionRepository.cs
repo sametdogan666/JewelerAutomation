@@ -17,6 +17,23 @@ public class CustomerTransactionRepository : ICustomerTransactionRepository
         return entity;
     }
 
+    public async Task<CustomerTransaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _context.CustomerTransactions
+            .Include(t => t.Customer)
+            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+    }
+
+    public void Update(CustomerTransaction entity)
+    {
+        _context.CustomerTransactions.Update(entity);
+    }
+
+    public void Delete(CustomerTransaction entity)
+    {
+        _context.CustomerTransactions.Remove(entity);
+    }
+
     public async Task<IReadOnlyList<CustomerTransaction>> GetStatementAsync(Guid customerId, DateTime? fromDate = null, DateTime? toDate = null, CancellationToken cancellationToken = default)
     {
         IQueryable<CustomerTransaction> query = _context.CustomerTransactions.Where(x => x.CustomerId == customerId);
