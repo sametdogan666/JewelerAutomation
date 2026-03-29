@@ -28,6 +28,8 @@ builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
 builder.Services.AddScoped<ICustomerMovementRepository, CustomerMovementRepository>();
 builder.Services.AddScoped<ICustomerTransactionRepository, CustomerTransactionRepository>();
 builder.Services.AddScoped<ICashPeggingLogRepository, CashPeggingLogRepository>();
+builder.Services.AddScoped<ILedgerRepository, LedgerRepository>();
+builder.Services.AddScoped<ICashToGoldConversionRepository, CashToGoldConversionRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 builder.Services.AddScoped<IAccountingService, AccountingService>();
@@ -35,6 +37,8 @@ builder.Services.AddScoped<ICashPeggingService, CashPeggingService>();
 builder.Services.AddScoped<ICapitalCalculationService, CapitalCalculationService>();
 builder.Services.AddScoped<ISafeStatusService, SafeStatusService>();
 builder.Services.AddScoped<IProfitCalculationService, ProfitCalculationService>();
+builder.Services.AddScoped<ILedgerService, LedgerService>();
+builder.Services.AddScoped<ILedgerMigrationService, LedgerMigrationService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 
 // JWT

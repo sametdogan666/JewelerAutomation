@@ -10,5 +10,7 @@ public interface IUnitOfWork : IDisposable
     ICustomerMovementRepository CustomerMovements { get; }
     ICustomerTransactionRepository CustomerTransactions { get; }
     ICashPeggingLogRepository CashPeggingLogs { get; }
+    ILedgerRepository Ledger { get; }
+    ICashToGoldConversionRepository CashToGoldConversions { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

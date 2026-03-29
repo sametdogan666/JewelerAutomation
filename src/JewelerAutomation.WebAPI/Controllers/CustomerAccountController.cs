@@ -13,11 +13,13 @@ public class CustomerAccountController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAccountingService _accounting;
+    private readonly ILedgerService _ledger;
 
-    public CustomerAccountController(IUnitOfWork unitOfWork, IAccountingService accounting)
+    public CustomerAccountController(IUnitOfWork unitOfWork, IAccountingService accounting, ILedgerService ledger)
     {
         _unitOfWork = unitOfWork;
         _accounting = accounting;
+        _ledger = ledger;
     }
 
     /// <summary>
@@ -79,6 +81,18 @@ public class CustomerAccountController : ControllerBase
             Description = dto.Description
         };
         await _unitOfWork.CustomerTransactions.AddAsync(entity, cancellationToken).ConfigureAwait(false);
+
+        await _ledger.RecordCustomerTransactionAsync(
+            transactionDate: entity.TransactionDate,
+            transactionType: entity.TransactionType,
+            goldHasAmount: goldHas,
+            cashAmount: entity.CashAmount,
+            customerId: customerId,
+            referenceId: entity.Id,
+            description: entity.Description,
+            cancellationToken: cancellationToken
+        ).ConfigureAwait(false);
+
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         return CreatedAtAction(nameof(GetCustomerStatement), new { customerId }, new CustomerTransactionDto(entity.Id, entity.TransactionDate, entity.TransactionType, entity.GoldGram, entity.GoldMilyem, entity.GoldHas, entity.CashAmount, entity.Description));
@@ -92,6 +106,12 @@ public class CustomerAccountController : ControllerBase
     {
         var transaction = await _unitOfWork.CustomerTransactions.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (transaction == null) return NotFound();
+
+        await _ledger.DeleteEntriesByReferenceAsync(
+            LedgerReferenceType.CustomerTransaction,
+            id,
+            cancellationToken
+        ).ConfigureAwait(false);
 
         _unitOfWork.CustomerTransactions.Delete(transaction);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -111,15 +131,40 @@ public class CustomerAccountController : ControllerBase
         var transaction = await _unitOfWork.CustomerTransactions.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (transaction == null) return NotFound();
 
+        decimal goldHas = request.GoldHas;
+        if (request.TransactionType is CustomerTransactionType.GoldPurchase or CustomerTransactionType.GoldSale)
+        {
+            if (request.GoldGram > 0 && request.GoldMilyem >= 0)
+                goldHas = _accounting.CalculateHasGram(request.GoldGram, request.GoldMilyem);
+        }
+
         transaction.TransactionDate = request.TransactionDate;
         transaction.TransactionType = request.TransactionType;
         transaction.GoldGram = request.GoldGram;
         transaction.GoldMilyem = request.GoldMilyem;
-        transaction.GoldHas = request.GoldGram * (request.GoldMilyem / 1000m);
+        transaction.GoldHas = goldHas;
         transaction.CashAmount = request.CashAmount;
         transaction.Description = request.Description;
 
         _unitOfWork.CustomerTransactions.Update(transaction);
+
+        await _ledger.DeleteEntriesByReferenceAsync(
+            LedgerReferenceType.CustomerTransaction,
+            id,
+            cancellationToken
+        ).ConfigureAwait(false);
+
+        await _ledger.RecordCustomerTransactionAsync(
+            transactionDate: request.TransactionDate,
+            transactionType: request.TransactionType,
+            goldHasAmount: goldHas,
+            cashAmount: request.CashAmount,
+            customerId: transaction.CustomerId,
+            referenceId: id,
+            description: request.Description,
+            cancellationToken: cancellationToken
+        ).ConfigureAwait(false);
+
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         var dto = new CustomerTransactionDto(

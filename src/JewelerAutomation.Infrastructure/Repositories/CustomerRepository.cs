@@ -17,6 +17,12 @@ public class CustomerRepository : ICustomerRepository
     public async Task<IReadOnlyList<Customer>> GetAllAsync(CancellationToken cancellationToken = default)
         => await _context.Customers.OrderBy(c => c.Name).ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Customer>> GetByTypeAsync(CustomerType type, CancellationToken cancellationToken = default)
+        => await _context.Customers
+            .Where(c => c.Type == type)
+            .OrderBy(c => c.Name)
+            .ToListAsync(cancellationToken);
+
     public async Task<Customer> AddAsync(Customer entity, CancellationToken cancellationToken = default)
     {
         await _context.Customers.AddAsync(entity, cancellationToken);

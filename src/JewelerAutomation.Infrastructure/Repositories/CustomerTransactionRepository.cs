@@ -24,6 +24,13 @@ public class CustomerTransactionRepository : ICustomerTransactionRepository
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<CustomerTransaction>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.CustomerTransactions
+            .OrderBy(t => t.TransactionDate)
+            .ToListAsync(cancellationToken);
+    }
+
     public void Update(CustomerTransaction entity)
     {
         _context.CustomerTransactions.Update(entity);

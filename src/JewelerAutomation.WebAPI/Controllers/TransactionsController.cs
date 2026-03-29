@@ -13,11 +13,13 @@ public class TransactionsController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAccountingService _accounting;
+    private readonly ILedgerService _ledger;
 
-    public TransactionsController(IUnitOfWork unitOfWork, IAccountingService accounting)
+    public TransactionsController(IUnitOfWork unitOfWork, IAccountingService accounting, ILedgerService ledger)
     {
         _unitOfWork = unitOfWork;
         _accounting = accounting;
+        _ledger = ledger;
     }
 
     [HttpGet]
@@ -101,6 +103,17 @@ public class TransactionsController : ControllerBase
         };
         await _unitOfWork.SafeMovements.AddAsync(safeMovement, cancellationToken).ConfigureAwait(false);
 
+        await _ledger.RecordTransactionAsync(
+            transactionDate: dto.TransactionDate,
+            direction: dto.Direction,
+            goldHasAmount: hasGram,
+            cashAmount: dto.Price,
+            referenceId: transaction.Id,
+            customerId: dto.CustomerId,
+            description: dto.Description,
+            cancellationToken: cancellationToken
+        ).ConfigureAwait(false);
+
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return CreatedAtAction(nameof(GetById), new { id = transaction.Id }, transaction);
     }
@@ -166,6 +179,23 @@ public class TransactionsController : ControllerBase
             relatedMovement.UpdatedAt = DateTime.UtcNow;
         }
 
+        await _ledger.DeleteEntriesByReferenceAsync(
+            LedgerReferenceType.Transaction,
+            id,
+            cancellationToken
+        ).ConfigureAwait(false);
+
+        await _ledger.RecordTransactionAsync(
+            transactionDate: dto.TransactionDate,
+            direction: dto.Direction,
+            goldHasAmount: hasGram,
+            cashAmount: dto.Price,
+            referenceId: transaction.Id,
+            customerId: dto.CustomerId,
+            description: dto.Description,
+            cancellationToken: cancellationToken
+        ).ConfigureAwait(false);
+
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return Ok(transaction);
     }
@@ -186,6 +216,12 @@ public class TransactionsController : ControllerBase
         {
             _unitOfWork.SafeMovements.Delete(relatedMovement);
         }
+
+        await _ledger.DeleteEntriesByReferenceAsync(
+            LedgerReferenceType.Transaction,
+            id,
+            cancellationToken
+        ).ConfigureAwait(false);
 
         _unitOfWork.Transactions.Delete(transaction);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

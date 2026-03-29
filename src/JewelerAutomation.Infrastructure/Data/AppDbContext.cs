@@ -15,6 +15,8 @@ public class AppDbContext : DbContext
     public DbSet<SafeMovement> SafeMovements => Set<SafeMovement>();
     public DbSet<Inventory> Inventories => Set<Inventory>();
     public DbSet<CashPeggingLog> CashPeggingLogs => Set<CashPeggingLog>();
+    public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
+    public DbSet<CashToGoldConversion> CashToGoldConversions => Set<CashToGoldConversion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -98,6 +100,28 @@ public class AppDbContext : DbContext
             e.Property(x => x.NetProfitHasGram).HasPrecision(precision, scale);
             e.Property(x => x.Notes).HasMaxLength(1024);
             e.HasIndex(x => x.PeggingDate);
+        });
+
+        modelBuilder.Entity<LedgerEntry>(e =>
+        {
+            e.Property(x => x.GoldHasAmount).HasPrecision(precision, scale);
+            e.Property(x => x.CashAmount).HasPrecision(precision, scale);
+            e.Property(x => x.Description).HasMaxLength(512);
+            e.HasIndex(x => x.TransactionDate);
+            e.HasIndex(x => x.CustomerId);
+            e.HasIndex(x => new { x.ReferenceType, x.ReferenceId });
+            e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CashToGoldConversion>(e =>
+        {
+            e.Property(x => x.CashAmount).HasPrecision(precision, scale);
+            e.Property(x => x.HasPrice).HasPrecision(precision, scale);
+            e.Property(x => x.ConvertedGoldHas).HasPrecision(precision, scale);
+            e.Property(x => x.Description).HasMaxLength(512);
+            e.HasIndex(x => x.TransactionDate);
+            e.HasIndex(x => x.CustomerId);
+            e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }
