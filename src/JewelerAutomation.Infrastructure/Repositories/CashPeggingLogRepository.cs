@@ -36,4 +36,10 @@ public class CashPeggingLogRepository : ICashPeggingLogRepository
         => await _context.CashPeggingLogs
             .OrderByDescending(x => x.PeggingDate)
             .FirstOrDefaultAsync(cancellationToken);
+
+    public void Update(CashPeggingLog entity)
+        => _context.CashPeggingLogs.Update(entity);
+
+    public void Delete(CashPeggingLog entity)
+        => _context.CashPeggingLogs.Remove(entity);
 }

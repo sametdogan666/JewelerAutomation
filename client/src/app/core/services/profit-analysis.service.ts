@@ -4,14 +4,14 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 export interface PeggingSimulation {
-  cashBalance: number;
-  goldBalance: number;
+  periodCashBalance: number;
+  goldBalanceInSafe: number;
   cashEquivalentHasGram: number;
-  totalCapitalHasGram: number;
-  initialCapitalHasGram: number;
+  totalSalesHasGram: number;
+  totalPurchasesHasGram: number;
   transactionProfitHasGram: number;
-  exchangeRateProfitHasGram: number;
   netProfitHasGram: number;
+  netProfitTL: number;
 }
 
 export interface CashPeggingLog {
@@ -24,8 +24,6 @@ export interface CashPeggingLog {
   totalCapitalHasGram: number;
   periodStartDate: string;
   periodEndDate: string;
-  transactionProfitHasGram: number;
-  exchangeRateProfitHasGram: number;
   netProfitHasGram: number;
   notes?: string;
 }

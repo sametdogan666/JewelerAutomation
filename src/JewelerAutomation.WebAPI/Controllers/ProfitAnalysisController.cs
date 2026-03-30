@@ -7,6 +7,7 @@ using JewelerAutomation.Core.Entities;
 namespace JewelerAutomation.WebAPI.Controllers;
 
 [ApiController]
+[Route("api/profit-analysis")]
 [Authorize]
 public class ProfitAnalysisController : ControllerBase
 {
@@ -19,11 +20,7 @@ public class ProfitAnalysisController : ControllerBase
         _accounting = accounting;
     }
 
-    /// <summary>
-    /// Nakit bağlama simülasyonu yapar (kayıt oluşturmaz).
-    /// </summary>
-    [HttpPost]
-    [Route("api/profit-analysis/simulate")]
+    [HttpPost("simulate")]
     public async Task<ActionResult<PeggingSimulationDto>> Simulate(
         [FromBody] SimulatePeggingRequest request,
         CancellationToken cancellationToken)
@@ -36,22 +33,18 @@ public class ProfitAnalysisController : ControllerBase
         );
 
         return Ok(new PeggingSimulationDto(
-            result.CashBalance,
-            result.GoldBalance,
+            result.PeriodCashBalance,
+            result.GoldBalanceInSafe,
             result.CashEquivalentHasGram,
-            result.TotalCapitalHasGram,
-            result.InitialCapitalHasGram,
+            result.TotalSalesHasGram,
+            result.TotalPurchasesHasGram,
             result.TransactionProfitHasGram,
-            result.ExchangeRateProfitHasGram,
-            result.NetProfitHasGram
+            result.NetProfitHasGram,
+            result.NetProfitTL
         ));
     }
 
-    /// <summary>
-    /// Nakit bağlama işlemini gerçekleştirir ve kaydeder.
-    /// </summary>
-    [HttpPost]
-    [Route("api/profit-analysis/peg-cash")]
+    [HttpPost("peg-cash")]
     public async Task<ActionResult<CashPeggingLogDto>> PegCash(
         [FromBody] CreatePeggingRequest request,
         CancellationToken cancellationToken)
@@ -61,16 +54,49 @@ public class ProfitAnalysisController : ControllerBase
             request.PeriodEnd,
             request.GoldPricePerGram,
             request.Notes,
-            null, // TODO: Get current user ID from claims
+            null,
             cancellationToken
         );
 
         return Ok(MapToDto(log));
     }
 
-    /// <summary>
-    /// Nakit bağlama geçmişini getirir.
-    /// </summary>
+    [HttpDelete("pegging/{id:guid}")]
+    public async Task<ActionResult> DeletePegging(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _pegging.DeletePeggingAsync(id, cancellationToken);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("pegging/{id:guid}")]
+    public async Task<ActionResult<CashPeggingLogDto>> UpdatePegging(
+        Guid id,
+        [FromBody] UpdatePeggingRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var log = await _pegging.UpdatePeggingAsync(
+                id,
+                request.GoldPricePerGram,
+                request.Notes,
+                cancellationToken
+            );
+            return Ok(MapToDto(log));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
     [HttpGet("pegging-history")]
     public async Task<ActionResult<IReadOnlyList<CashPeggingLogDto>>> GetPeggingHistory(
         [FromQuery] DateTime? from,
@@ -87,11 +113,7 @@ public class ProfitAnalysisController : ControllerBase
         return Ok(logs.Select(MapToDto).ToList());
     }
 
-    /// <summary>
-    /// En son nakit bağlama kaydını getirir.
-    /// </summary>
-    [HttpGet]
-    [Route("api/profit-analysis/latest-pegging")]
+    [HttpGet("latest-pegging")]
     public async Task<ActionResult<CashPeggingLogDto>> GetLatestPegging(CancellationToken cancellationToken)
     {
         var log = await _pegging.GetLatestPeggingAsync(cancellationToken);
@@ -99,11 +121,7 @@ public class ProfitAnalysisController : ControllerBase
         return Ok(MapToDto(log));
     }
 
-    /// <summary>
-    /// Dönemsel işlem özetini getirir (haftalık alış-satış detayı).
-    /// </summary>
-    [HttpGet]
-    [Route("api/profit-analysis/period-summary")]
+    [HttpGet("period-summary")]
     public async Task<ActionResult<PeriodSummaryDto>> GetPeriodSummary(
         [FromQuery] DateTime periodStart,
         [FromQuery] DateTime periodEnd,
@@ -145,8 +163,6 @@ public class ProfitAnalysisController : ControllerBase
         log.TotalCapitalHasGram,
         log.PeriodStartDate,
         log.PeriodEndDate,
-        log.TransactionProfitHasGram,
-        log.ExchangeRateProfitHasGram,
         log.NetProfitHasGram,
         log.Notes
     );
@@ -165,15 +181,20 @@ public record CreatePeggingRequest(
     string? Notes
 );
 
+public record UpdatePeggingRequest(
+    decimal GoldPricePerGram,
+    string? Notes
+);
+
 public record PeggingSimulationDto(
-    decimal CashBalance,
-    decimal GoldBalance,
+    decimal PeriodCashBalance,
+    decimal GoldBalanceInSafe,
     decimal CashEquivalentHasGram,
-    decimal TotalCapitalHasGram,
-    decimal InitialCapitalHasGram,
+    decimal TotalSalesHasGram,
+    decimal TotalPurchasesHasGram,
     decimal TransactionProfitHasGram,
-    decimal ExchangeRateProfitHasGram,
-    decimal NetProfitHasGram
+    decimal NetProfitHasGram,
+    decimal NetProfitTL
 );
 
 public record CashPeggingLogDto(
@@ -186,8 +207,6 @@ public record CashPeggingLogDto(
     decimal TotalCapitalHasGram,
     DateTime PeriodStartDate,
     DateTime PeriodEndDate,
-    decimal TransactionProfitHasGram,
-    decimal ExchangeRateProfitHasGram,
     decimal NetProfitHasGram,
     string? Notes
 );

@@ -29,6 +29,11 @@ public class LedgerEntry : BaseEntity
     public Guid? ReferenceId { get; set; }
     public Guid? CustomerId { get; set; }
     public string? Description { get; set; }
+
+    /// <summary>
+    /// Links this ledger entry to a parent operation (e.g. CashPegging).
+    /// </summary>
+    public Guid? CorrelationId { get; set; }
     
     public Customer? Customer { get; set; }
 }

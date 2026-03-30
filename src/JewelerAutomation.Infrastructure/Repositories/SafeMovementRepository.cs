@@ -38,6 +38,11 @@ public class SafeMovementRepository : ISafeMovementRepository
         return entity;
     }
 
+    public async Task<IReadOnlyList<Core.Entities.SafeMovement>> FindByCorrelationIdAsync(Guid correlationId, CancellationToken cancellationToken = default)
+        => await _context.SafeMovements
+            .Where(m => m.CorrelationId == correlationId)
+            .ToListAsync(cancellationToken);
+
     public void Update(Core.Entities.SafeMovement entity) => _context.SafeMovements.Update(entity);
 
     public void Delete(Core.Entities.SafeMovement entity) => _context.SafeMovements.Remove(entity);

@@ -4,9 +4,14 @@ namespace JewelerAutomation.Core.Entities;
 /// Nakit Bağlama işleminin kaydı.
 /// Kullanıcı biriken nakiti belirli bir has fiyatından altına çevirdiğinde oluşur.
 /// </summary>
-public class CashPeggingLog
+public class CashPeggingLog : ISoftDelete
 {
     public Guid Id { get; set; }
+
+    /// <summary>
+    /// Groups all related records (Transaction, SafeMovement, LedgerEntry) created by this pegging operation.
+    /// </summary>
+    public Guid CorrelationId { get; set; }
     
     /// <summary>
     /// Nakit bağlama işleminin yapıldığı tarih.
@@ -77,4 +82,6 @@ public class CashPeggingLog
     public Guid? UserId { get; set; }
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
 }

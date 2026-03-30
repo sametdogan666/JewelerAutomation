@@ -5,11 +5,11 @@
         <mat-icon class="page-icon">shopping_cart</mat-icon>
         Alış-Satış İşlemleri
       </h1>
-      <p class="page-subtitle">Satış ve alış işlemlerinizi listeleyin. Her işlem kasayı otomatik günceller.</p>
+      <p class="page-subtitle">Sepet/fatura bazlı alış ve satış kayıtlarınızı görüntüleyin.</p>
     </div>
     <a mat-flat-button color="primary" routerLink="/transactions/new" class="btn-primary">
       <mat-icon>add</mat-icon>
-      Yeni işlem
+      Yeni Sepet
     </a>
   </div>
 
@@ -44,7 +44,7 @@
             </mat-form-field>
 
             <div class="date-actions">
-              <button mat-raised-button color="primary" (click)="applyCustomDateRange()" 
+              <button mat-raised-button color="primary" (click)="applyCustomDateRange()"
                       [disabled]="!dateRangeForm.value.startDate || !dateRangeForm.value.endDate">
                 <mat-icon>check</mat-icon>
                 Uygula
@@ -67,50 +67,49 @@
         <p>Yükleniyor…</p>
       </mat-card-content>
     } @else {
-      <table mat-table [dataSource]="dataSource" class="data-table">
+      <table mat-table [dataSource]="dataSource" class="data-table" multiTemplateDataRows>
         <!-- Tarih -->
         <ng-container matColumnDef="transactionDate">
           <th mat-header-cell *matHeaderCellDef>Tarih</th>
           <td mat-cell *matCellDef="let row">{{ formatDate(row.transactionDate) }}</td>
         </ng-container>
 
-        <!-- Tür (Alış/Satış) -->
+        <!-- Kalem Sayısı -->
+        <ng-container matColumnDef="itemCount">
+          <th mat-header-cell *matHeaderCellDef>Kalem</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="item-count-badge">{{ row.items?.length || 1 }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Net Yön -->
         <ng-container matColumnDef="direction">
-          <th mat-header-cell *matHeaderCellDef>Tür</th>
+          <th mat-header-cell *matHeaderCellDef>Net Yön</th>
           <td mat-cell *matCellDef="let row">
             <span class="badge" [ngClass]="{
-              'badge-sale': row.direction === 0,
-              'badge-purchase': row.direction === 1
+              'badge-sale': row.netHasGram < 0,
+              'badge-purchase': row.netHasGram > 0,
+              'badge-neutral': row.netHasGram === 0
             }">
-              {{ directionLabel(row.direction) }}
+              {{ netLabel(row) }}
             </span>
           </td>
         </ng-container>
 
-        <!-- Miktar -->
-        <ng-container matColumnDef="quantity">
-          <th mat-header-cell *matHeaderCellDef>Miktar (gr)</th>
-          <td mat-cell *matCellDef="let row">{{ row.quantity | number:'1.2-2' }}</td>
+        <!-- Net Has Gram -->
+        <ng-container matColumnDef="netHasGram">
+          <th mat-header-cell *matHeaderCellDef>Net Has Gr</th>
+          <td mat-cell *matCellDef="let row" [ngClass]="{'text-positive': row.netHasGram > 0, 'text-negative': row.netHasGram < 0}">
+            {{ row.netHasGram > 0 ? '+' : '' }}{{ row.netHasGram | number:'1.2-2' }}
+          </td>
         </ng-container>
 
-        <!-- Milyem -->
-        <ng-container matColumnDef="milyem">
-          <th mat-header-cell *matHeaderCellDef>Milyem</th>
-          <td mat-cell *matCellDef="let row">{{ row.milyem }}</td>
-        </ng-container>
-
-        <!-- Has Gram -->
-        <ng-container matColumnDef="hasGram">
-          <th mat-header-cell *matHeaderCellDef>Has Gr</th>
-          <td mat-cell *matCellDef="let row">{{ row.hasGram | number:'1.2-2' }}</td>
-        </ng-container>
-
-        <!-- Fiyat -->
-        <ng-container matColumnDef="price">
-          <th mat-header-cell *matHeaderCellDef>Fiyat (TL)</th>
-          <td mat-cell *matCellDef="let row">
-            @if (row.price != null && row.price > 0) {
-              {{ row.price | number:'1.0-0' }} ₺
+        <!-- Net Nakit -->
+        <ng-container matColumnDef="netCashAmount">
+          <th mat-header-cell *matHeaderCellDef>Net Nakit (₺)</th>
+          <td mat-cell *matCellDef="let row" [ngClass]="{'text-positive': row.netCashAmount > 0, 'text-negative': row.netCashAmount < 0}">
+            @if (row.netCashAmount !== 0) {
+              {{ row.netCashAmount > 0 ? '+' : '' }}{{ row.netCashAmount | number:'1.0-0' }} ₺
             } @else {
               <span class="text-muted">—</span>
             }
@@ -120,7 +119,7 @@
         <!-- Cari -->
         <ng-container matColumnDef="customer">
           <th mat-header-cell *matHeaderCellDef>Cari</th>
-          <td mat-cell *matCellDef="let row">{{ row.customer?.name ?? '—' }}</td>
+          <td mat-cell *matCellDef="let row">{{ row.customerName ?? '—' }}</td>
         </ng-container>
 
         <!-- Açıklama -->
@@ -129,25 +128,17 @@
           <td mat-cell *matCellDef="let row">{{ row.description || '—' }}</td>
         </ng-container>
 
-        <!-- İşlemler (Edit/Delete) -->
+        <!-- İşlemler -->
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef class="actions-header">İşlemler</th>
           <td mat-cell *matCellDef="let row" class="actions-cell">
-            <button 
-              mat-icon-button 
-              color="primary" 
-              [routerLink]="['/transactions', row.id, 'edit']" 
-              matTooltip="Düzenle"
-              type="button">
+            <button mat-icon-button type="button" (click)="toggleExpand(row)" matTooltip="Kalemleri göster">
+              <mat-icon>{{ expandedRow() === row.id ? 'expand_less' : 'expand_more' }}</mat-icon>
+            </button>
+            <button mat-icon-button color="primary" [routerLink]="['/transactions', row.id, 'edit']" matTooltip="Düzenle" type="button">
               <mat-icon>edit</mat-icon>
             </button>
-            <button 
-              mat-icon-button 
-              color="warn" 
-              (click)="onDelete(row)" 
-              [disabled]="deleting() === row.id" 
-              matTooltip="Sil"
-              type="button">
+            <button mat-icon-button color="warn" (click)="onDelete(row)" [disabled]="deleting() === row.id" matTooltip="Sil" type="button">
               @if (deleting() === row.id) {
                 <mat-icon>hourglass_empty</mat-icon>
               } @else {
@@ -157,15 +148,67 @@
           </td>
         </ng-container>
 
+        <!-- Expanded Detail Row -->
+        <ng-container matColumnDef="expandedDetail">
+          <td mat-cell *matCellDef="let row" [attr.colspan]="displayedColumns.length">
+            @if (expandedRow() === row.id && row.items?.length > 0) {
+              <div class="expanded-detail">
+                <table class="detail-table">
+                  <thead>
+                    <tr>
+                      <th>Tür</th>
+                      <th>Miktar (gr)</th>
+                      <th>Milyem</th>
+                      <th>Has Gr</th>
+                      <th>Fiyat (₺)</th>
+                      <th>İşçilik</th>
+                      <th>Açıklama</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of row.items; track item.id) {
+                      <tr [ngClass]="{'detail-sale': item.direction === 0, 'detail-purchase': item.direction === 1}">
+                        <td>
+                          <span class="badge-sm" [ngClass]="{'badge-sale': item.direction === 0, 'badge-purchase': item.direction === 1}">
+                            {{ item.direction === 0 ? 'Satış' : 'Alış' }}
+                          </span>
+                        </td>
+                        <td>{{ item.quantity | number:'1.2-2' }}</td>
+                        <td>{{ item.milyem }}</td>
+                        <td>{{ item.hasGram | number:'1.2-2' }}</td>
+                        <td>
+                          @if (item.price != null && item.price > 0) {
+                            {{ item.price | number:'1.0-0' }} ₺
+                          } @else {
+                            —
+                          }
+                        </td>
+                        <td>{{ item.totalLabour !== 0 ? (item.totalLabour | number:'1.2-2') : '—' }}</td>
+                        <td>{{ item.description || '—' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </td>
+        </ng-container>
+
         <!-- Header & Row Definitions -->
         <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns" class="table-row"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns"
+            class="table-row"
+            [class.expanded-row]="expandedRow() === row.id"></tr>
+        <tr mat-row *matRowDef="let row; columns: ['expandedDetail']"
+            class="detail-row"
+            [class.detail-row--visible]="expandedRow() === row.id"></tr>
       </table>
+
       @if (dataSource.data.length === 0 && !loading()) {
         <mat-card-content class="empty-state">
           <mat-icon>swap_horiz</mat-icon>
           <p>Henüz alış-satış kaydı yok.</p>
-          <a mat-flat-button color="primary" routerLink="/transactions/new">Yeni işlem ekle</a>
+          <a mat-flat-button color="primary" routerLink="/transactions/new">Yeni sepet oluştur</a>
         </mat-card-content>
       }
     }

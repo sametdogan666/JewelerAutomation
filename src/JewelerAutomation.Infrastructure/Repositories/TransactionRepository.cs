@@ -14,11 +14,13 @@ public class TransactionRepository : ITransactionRepository
     public async Task<Transaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => await _context.Transactions
             .Include(t => t.Customer)
+            .Include(t => t.Items)
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
 
     public async Task<IReadOnlyList<Transaction>> GetAllAsync(CancellationToken cancellationToken = default)
         => await _context.Transactions
             .Include(t => t.Customer)
+            .Include(t => t.Items)
             .OrderByDescending(t => t.TransactionDate)
             .ThenByDescending(t => t.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -26,6 +28,7 @@ public class TransactionRepository : ITransactionRepository
     public async Task<IReadOnlyList<Transaction>> GetByDateRangeAsync(DateTime from, DateTime to, CancellationToken cancellationToken = default)
         => await _context.Transactions
             .Include(t => t.Customer)
+            .Include(t => t.Items)
             .Where(t => t.TransactionDate >= from && t.TransactionDate <= to)
             .OrderBy(t => t.TransactionDate)
             .ToListAsync(cancellationToken);
@@ -36,7 +39,16 @@ public class TransactionRepository : ITransactionRepository
         return entity;
     }
 
+    public async Task<IReadOnlyList<Transaction>> FindByCorrelationIdAsync(Guid correlationId, CancellationToken cancellationToken = default)
+        => await _context.Transactions
+            .Include(t => t.Items)
+            .Where(t => t.CorrelationId == correlationId)
+            .ToListAsync(cancellationToken);
+
     public void Update(Transaction entity) => _context.Transactions.Update(entity);
 
     public void Delete(Transaction entity) => _context.Transactions.Remove(entity);
+
+    public void RemoveItems(IEnumerable<TransactionItem> items)
+        => _context.TransactionItems.RemoveRange(items);
 }

@@ -3,6 +3,7 @@ using System;
 using JewelerAutomation.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace JewelerAutomation.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260330181547_AddCorrelationId")]
+    partial class AddCorrelationId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -509,14 +512,6 @@ namespace JewelerAutomation.Infrastructure.Migrations
                         .HasPrecision(18, 6)
                         .HasColumnType("numeric(18,6)");
 
-                    b.Property<decimal>("NetCashAmount")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("numeric(18,6)");
-
-                    b.Property<decimal>("NetHasGram")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("numeric(18,6)");
-
                     b.Property<int?>("PieceCount")
                         .HasColumnType("integer");
 
@@ -549,71 +544,6 @@ namespace JewelerAutomation.Infrastructure.Migrations
                     b.HasIndex("CustomerId");
 
                     b.ToTable("Transactions");
-                });
-
-            modelBuilder.Entity("JewelerAutomation.Core.Entities.TransactionItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<int>("Direction")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("HasGram")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("numeric(18,6)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<decimal>("Milyem")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("numeric(18,6)");
-
-                    b.Property<decimal>("MilyemLabour")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("numeric(18,6)");
-
-                    b.Property<int?>("PieceCount")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("Price")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("numeric(18,6)");
-
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("numeric(18,6)");
-
-                    b.Property<decimal>("TotalLabour")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("numeric(18,6)");
-
-                    b.Property<Guid>("TransactionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("UnitLabour")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("numeric(18,6)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TransactionId");
-
-                    b.ToTable("TransactionItems");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.User", b =>
@@ -719,27 +649,11 @@ namespace JewelerAutomation.Infrastructure.Migrations
                     b.Navigation("Customer");
                 });
 
-            modelBuilder.Entity("JewelerAutomation.Core.Entities.TransactionItem", b =>
-                {
-                    b.HasOne("JewelerAutomation.Core.Entities.Transaction", "Transaction")
-                        .WithMany("Items")
-                        .HasForeignKey("TransactionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Transaction");
-                });
-
             modelBuilder.Entity("JewelerAutomation.Core.Entities.Customer", b =>
                 {
                     b.Navigation("AccountTransactions");
 
                     b.Navigation("Movements");
-                });
-
-            modelBuilder.Entity("JewelerAutomation.Core.Entities.Transaction", b =>
-                {
-                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }

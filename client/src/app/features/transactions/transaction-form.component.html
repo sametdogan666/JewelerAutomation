@@ -1,286 +1,249 @@
-<div class="transaction-form-page">
+<div class="basket-form-page">
   <div class="page-header">
     <a mat-button routerLink="/transactions" class="back-link">
       <mat-icon>arrow_back</mat-icon>
       Alış-Satış listesi
     </a>
     <div class="page-title-block">
-      <h1 class="page-title">{{ editMode() ? 'İşlemi düzenle' : 'Yeni işlem' }}</h1>
-      <p class="page-subtitle">Altın alış veya satış kaydı {{ editMode() ? 'güncelleyin' : 'oluşturun' }}. Has Gram otomatik hesaplanır.</p>
+      <h1 class="page-title">{{ editMode() ? 'Sepeti düzenle' : 'Yeni Sepet / Fatura' }}</h1>
+      <p class="page-subtitle">Birden fazla alış ve satış kalemini tek işlemde kaydedin.</p>
     </div>
   </div>
 
-  <form [formGroup]="form" (ngSubmit)="onSubmit()">
-    <div class="form-layout">
-      <div class="form-main">
-        <!-- 1. Transaction Type -->
-        <mat-card class="section-card">
-          <mat-card-content>
-            <h2 class="section-title">
-              <mat-icon class="section-icon">swap_horiz</mat-icon>
-              İşlem türü
-            </h2>
-            <mat-radio-group formControlName="direction" class="direction-group">
-              <mat-radio-button [value]="0" class="direction-option direction-sale">
-                <span class="direction-content">
-                  <span class="direction-label">Satış</span>
-                  <span class="direction-hint">Müşteriye satış — kasada altın azalır</span>
-                </span>
-                <span class="badge badge-sale">Satış</span>
-              </mat-radio-button>
-              <mat-radio-button [value]="1" class="direction-option direction-purchase">
-                <span class="direction-content">
-                  <span class="direction-label">Alış</span>
-                  <span class="direction-hint">Tedarik / alış — kasada altın artar</span>
-                </span>
-                <span class="badge badge-purchase">Alış</span>
-              </mat-radio-button>
-            </mat-radio-group>
-          </mat-card-content>
-        </mat-card>
-
-        <!-- 2. Date & Gold Amount -->
-        <mat-card class="section-card">
-          <mat-card-content>
-            <h2 class="section-title">
-              <mat-icon class="section-icon">calendar_today</mat-icon>
-              Tarih ve miktar
-            </h2>
-            <div class="form-row form-row--3">
-              <mat-form-field appearance="outline">
-                <mat-label>Tarih</mat-label>
-                <input matInput type="date" formControlName="transactionDate" />
-                @if (form.get('transactionDate')?.invalid && form.get('transactionDate')?.touched) {
-                  <mat-error>Tarih gerekli</mat-error>
-                }
-              </mat-form-field>
-              <mat-form-field appearance="outline">
-                <mat-label>Miktar (gram)</mat-label>
-                <input matInput type="number" formControlName="quantity" step="0.001" min="0" />
-                <mat-hint>Örn: 3.5, 7, 14.25</mat-hint>
-                @if (form.get('quantity')?.hasError('required')) {
-                  <mat-error>Miktar gerekli</mat-error>
-                }
-                @if (form.get('quantity')?.hasError('min')) {
-                  <mat-error>0.001 gram ve üzeri girin</mat-error>
-                }
-              </mat-form-field>
-              <mat-form-field appearance="outline">
-                <mat-label>Milyem (saflık)</mat-label>
-                <input matInput type="number" formControlName="milyem" min="0" max="1000" />
-                <mat-hint>916, 995, 1000</mat-hint>
-                @if (form.get('milyem')?.hasError('min') || form.get('milyem')?.hasError('max')) {
-                  <mat-error>0–1000 arası olmalı</mat-error>
-                }
-              </mat-form-field>
-            </div>
-          </mat-card-content>
-        </mat-card>
-
-        <!-- 3. Labor / Workmanship (Sale only) -->
-        @if (isSale) {
-          <mat-card class="section-card section-card--highlight">
-            <mat-card-content>
-              <h2 class="section-title">
-                <mat-icon class="section-icon">build</mat-icon>
-                İşçilik
-              </h2>
-              <p class="section-desc">Adet ve birim işçilik Has Gram hesabına dahil edilir (satışta düşülür).</p>
-              <div class="form-row form-row--2">
-                <mat-form-field appearance="outline">
-                  <mat-label>Adet</mat-label>
-                  <input matInput type="number" formControlName="pieceCount" min="0" />
-                  <mat-hint>Parça adedi</mat-hint>
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Birim işçilik (TL)</mat-label>
-                  <input matInput type="text" formControlName="unitLabour" mask="separator.2" thousandSeparator="." decimalMarker="," />
-                </mat-form-field>
-              </div>
-            </mat-card-content>
-          </mat-card>
-        }
-
-        <!-- 4. Price & Customer -->
-        <mat-card class="section-card">
-          <mat-card-content>
-            <h2 class="section-title">
-              <mat-icon class="section-icon">payments</mat-icon>
-              Fiyat ve cari
-            </h2>
-            <div class="form-row form-row--2">
-              <mat-form-field appearance="outline">
-                <mat-label>Fiyat (TL)</mat-label>
-                <input matInput type="text" formControlName="price" mask="separator.2" thousandSeparator="." decimalMarker="," />
-                <mat-hint>İsteğe bağlı</mat-hint>
-              </mat-form-field>
-              <mat-form-field appearance="outline">
-                <mat-label>Cari</mat-label>
-                <mat-select formControlName="customerId">
-                  <mat-option [value]="null">— Cari seçin</mat-option>
-                  @for (c of customers(); track c.id) {
-                    <mat-option [value]="c.id">{{ c.name }}</mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
-            </div>
-          </mat-card-content>
-        </mat-card>
-
-        <!-- 5. Notes -->
-        <mat-card class="section-card">
-          <mat-card-content>
-            <h2 class="section-title">
-              <mat-icon class="section-icon">notes</mat-icon>
-              Notlar
-            </h2>
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Açıklama</mat-label>
-              <textarea matInput formControlName="description" rows="3" placeholder="Örn: 1 tüm, 2 çeyrek, hurda..."></textarea>
+  <div class="basket-layout">
+    <!-- ─── LEFT: Header + Items Grid ─── -->
+    <div class="basket-main">
+      <!-- Header Card -->
+      <mat-card class="section-card">
+        <mat-card-content>
+          <h2 class="section-title">
+            <mat-icon class="section-icon">calendar_today</mat-icon>
+            Fatura Bilgileri
+          </h2>
+          <div class="form-row form-row--3" [formGroup]="headerForm">
+            <mat-form-field appearance="outline">
+              <mat-label>Tarih</mat-label>
+              <input matInput type="date" formControlName="transactionDate" />
             </mat-form-field>
-          </mat-card-content>
-        </mat-card>
-
-        <div class="form-actions">
-          <button mat-flat-button color="primary" type="submit" class="btn-submit" [disabled]="form.invalid || saving()">
-            @if (saving()) {
-              <mat-spinner diameter="20"></mat-spinner>
-              <span>Kaydediliyor…</span>
-            } @else {
-              <mat-icon>save</mat-icon>
-              Kaydet
-            }
-          </button>
-          <a mat-button routerLink="/transactions">İptal</a>
-        </div>
-      </div>
-
-      <!-- Sidebar: Live calculation preview & Summary -->
-      <aside class="form-sidebar">
-        <!-- Transaction Summary (Full Preview) -->
-        @if (transactionSummary()) {
-          <mat-card class="summary-card">
-            <mat-card-header>
-              <div class="summary-header">
-                <mat-icon class="summary-icon">receipt_long</mat-icon>
-                <div>
-                  <mat-card-title>İşlem Özeti</mat-card-title>
-                  <mat-card-subtitle>Kaydetmeden önce kontrol edin</mat-card-subtitle>
-                </div>
-              </div>
-            </mat-card-header>
-            <mat-card-content>
-              <div class="summary-section">
-                <div class="summary-badge" [class.badge-sale]="transactionSummary()!.direction === 'Satış'" [class.badge-purchase]="transactionSummary()!.direction === 'Alış'">
-                  {{ transactionSummary()!.direction }}
-                </div>
-                <div class="summary-date">{{ transactionSummary()!.date | date:'dd.MM.yyyy' }}</div>
-              </div>
-
-              <div class="summary-divider"></div>
-
-              <!-- Gold Details -->
-              <div class="summary-section">
-                <h3 class="summary-section-title">Altın Detayları</h3>
-                <div class="summary-row">
-                  <span class="summary-label">Miktar</span>
-                  <span class="summary-value">{{ transactionSummary()!.quantity | number:'1.2-2' }} gr</span>
-                </div>
-                <div class="summary-row">
-                  <span class="summary-label">Milyem (Saflık)</span>
-                  <span class="summary-value">{{ transactionSummary()!.milyem }}</span>
-                </div>
-                <div class="summary-row">
-                  <span class="summary-label">Has (Saflıktan)</span>
-                  <span class="summary-value">{{ transactionSummary()!.hasFromPurity | number:'1.2-2' }} gr</span>
-                </div>
-                @if (transactionSummary()!.milyemLabour > 0) {
-                  <div class="summary-row">
-                    <span class="summary-label">Milyem İşçilik (>916)</span>
-                    <span class="summary-value">{{ transactionSummary()!.milyemLabour | number:'1.2-2' }} gr</span>
-                  </div>
+            <mat-form-field appearance="outline">
+              <mat-label>Cari</mat-label>
+              <mat-select formControlName="customerId">
+                <mat-option [value]="null">— Cari seçin</mat-option>
+                @for (c of customers(); track c.id) {
+                  <mat-option [value]="c.id">{{ c.name }}</mat-option>
                 }
-                @if (transactionSummary()!.totalLabour !== 0) {
-                  <div class="summary-row summary-row--negative">
-                    <span class="summary-label">İşçilik Düşümü</span>
-                    <span class="summary-value">{{ transactionSummary()!.totalLabour | number:'1.2-2' }} gr</span>
-                  </div>
-                }
-                <div class="summary-row summary-row--highlight">
-                  <span class="summary-label"><strong>Net Has Gram</strong></span>
-                  <span class="summary-value summary-value--large"><strong>{{ transactionSummary()!.finalHasGram | number:'1.2-2' }} gr</strong></span>
-                </div>
-              </div>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Genel Açıklama</mat-label>
+              <input matInput formControlName="description" placeholder="İsteğe bağlı" />
+            </mat-form-field>
+          </div>
+        </mat-card-content>
+      </mat-card>
 
-              @if (transactionSummary()!.price > 0) {
-                <div class="summary-divider"></div>
-                <!-- Financial Details -->
-                <div class="summary-section">
-                  <h3 class="summary-section-title">Mali Detaylar</h3>
-                  <div class="summary-row">
-                    <span class="summary-label">Birim Fiyat</span>
-                    <span class="summary-value">{{ transactionSummary()!.price | number:'1.2-2' }} ₺</span>
-                  </div>
-                  @if (transactionSummary()!.totalValue > 0) {
-                    <div class="summary-row summary-row--highlight">
-                      <span class="summary-label"><strong>Toplam Tutar</strong></span>
-                      <span class="summary-value summary-value--large"><strong>{{ transactionSummary()!.totalValue | number:'1.2-2' }} ₺</strong></span>
-                    </div>
+      <!-- Items Grid -->
+      <mat-card class="section-card items-card">
+        <mat-card-content>
+          <div class="items-header">
+            <h2 class="section-title">
+              <mat-icon class="section-icon">list_alt</mat-icon>
+              Kalemler
+            </h2>
+            <button mat-flat-button color="primary" type="button" (click)="addItem()" class="btn-add-item">
+              <mat-icon>add</mat-icon>
+              Kalem Ekle
+            </button>
+          </div>
+
+          <div class="items-grid">
+            <!-- Table Header -->
+            <div class="grid-header">
+              <div class="col-dir">Tür</div>
+              <div class="col-qty">Miktar (gr)</div>
+              <div class="col-mil">Milyem</div>
+              <div class="col-pc">Adet</div>
+              <div class="col-ul">B. İşçilik</div>
+              <div class="col-price">Fiyat (₺)</div>
+              <div class="col-has">Has Gr</div>
+              <div class="col-desc">Açıklama</div>
+              <div class="col-act"></div>
+            </div>
+
+            <!-- Item Rows -->
+            @for (item of itemsArray.controls; track item) {
+              <div class="grid-row" [formGroup]="$any(item)" [ngClass]="{'row-sale': item.get('direction')?.value === 0, 'row-purchase': item.get('direction')?.value === 1}">
+                <div class="col-dir">
+                  <mat-form-field appearance="outline" class="compact-field">
+                    <mat-select formControlName="direction">
+                      <mat-option [value]="0">Satış</mat-option>
+                      <mat-option [value]="1">Alış</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+                <div class="col-qty">
+                  <mat-form-field appearance="outline" class="compact-field">
+                    <input matInput type="number" formControlName="quantity" step="0.001" min="0" />
+                  </mat-form-field>
+                </div>
+                <div class="col-mil">
+                  <mat-form-field appearance="outline" class="compact-field">
+                    <input matInput type="number" formControlName="milyem" min="0" max="1000" />
+                  </mat-form-field>
+                </div>
+                <div class="col-pc">
+                  @if (isSaleItem($index)) {
+                    <mat-form-field appearance="outline" class="compact-field">
+                      <input matInput type="number" formControlName="pieceCount" min="0" />
+                    </mat-form-field>
+                  } @else {
+                    <span class="cell-na">—</span>
                   }
                 </div>
-              }
+                <div class="col-ul">
+                  @if (isSaleItem($index)) {
+                    <mat-form-field appearance="outline" class="compact-field">
+                      <input matInput type="text" formControlName="unitLabour" mask="separator.2" thousandSeparator="." decimalMarker="," />
+                    </mat-form-field>
+                  } @else {
+                    <span class="cell-na">—</span>
+                  }
+                </div>
+                <div class="col-price">
+                  <mat-form-field appearance="outline" class="compact-field">
+                    <input matInput type="text" formControlName="price" mask="separator.2" thousandSeparator="." decimalMarker="," />
+                  </mat-form-field>
+                </div>
+                <div class="col-has">
+                  <span class="has-value">{{ calcHasGram(item.getRawValue()) | number:'1.2-2' }}</span>
+                </div>
+                <div class="col-desc">
+                  <mat-form-field appearance="outline" class="compact-field">
+                    <input matInput formControlName="description" placeholder="Not" />
+                  </mat-form-field>
+                </div>
+                <div class="col-act">
+                  <button mat-icon-button color="warn" type="button" (click)="removeItem($index)"
+                          [disabled]="itemsArray.length <= 1" matTooltip="Kalemi sil">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
 
-              @if (transactionSummary()!.customer !== 'Belirsiz') {
-                <div class="summary-divider"></div>
-                <div class="summary-section">
-                  <h3 class="summary-section-title">Cari</h3>
-                  <div class="summary-row">
-                    <span class="summary-label">Müşteri</span>
-                    <span class="summary-value">{{ transactionSummary()!.customer }}</span>
-                  </div>
-                </div>
-              }
-            </mat-card-content>
-          </mat-card>
-        } @else {
-          <!-- Compact Preview (when summary not available) -->
-          <mat-card class="preview-card">
-            <mat-card-header>
-              <mat-card-title>Has Gram Önizleme</mat-card-title>
-              <mat-card-subtitle>Canlı hesaplama</mat-card-subtitle>
-            </mat-card-header>
-            <mat-card-content>
-              @if (canShowPreview()) {
-                <div class="preview-row">
-                  <span class="preview-label">Miktar × Milyem / 1000</span>
-                  <span class="preview-value">{{ hasFromPurity() | number:'1.2-2' }} <small>gr</small></span>
-                </div>
-                @if (isSale && (totalLabourPreview() !== 0)) {
-                  <div class="preview-row preview-row--labour">
-                    <span class="preview-label">İşçilik (düşüm)</span>
-                    <span class="preview-value">{{ totalLabourPreview() | number:'1.2-2' }} <small>gr</small></span>
-                  </div>
-                }
-                <div class="preview-row preview-row--total">
-                  <span class="preview-label">Toplam Has Gram</span>
-                  <span class="preview-value preview-value--emph">{{ hasGramPreview() | number:'1.2-2' }} <small>gr</small></span>
-                </div>
-              } @else {
-                <p class="preview-placeholder">Miktar ve milyem girin, canlı hesaplama burada görünecek.</p>
-              }
-            </mat-card-content>
-          </mat-card>
-        }
+          <div class="add-row-strip">
+            <button mat-stroked-button type="button" (click)="addItem(0)" class="btn-add-sale">
+              <mat-icon>remove_shopping_cart</mat-icon>
+              Satış Ekle
+            </button>
+            <button mat-stroked-button type="button" (click)="addItem(1)" class="btn-add-purchase">
+              <mat-icon>add_shopping_cart</mat-icon>
+              Alış Ekle
+            </button>
+          </div>
+        </mat-card-content>
+      </mat-card>
 
-        <mat-card class="info-card">
-          <mat-card-content>
-            <mat-icon class="info-icon">info</mat-icon>
-            <div>
-              <strong>Kasa etkisi:</strong> {{ isSale ? 'Satışta kasada altın azalır' : 'Alışta kasada altın artar' }}. İşlem sonrası <a routerLink="/kasa">Kasa</a> sayfasından hareketleri görebilirsiniz.
-            </div>
-          </mat-card-content>
-        </mat-card>
-      </aside>
+      <!-- Submit -->
+      <div class="form-actions">
+        <button mat-flat-button color="primary" type="button" (click)="onSubmit()" class="btn-submit"
+                [disabled]="itemsArray.length === 0 || saving()">
+          @if (saving()) {
+            <mat-spinner diameter="20"></mat-spinner>
+            <span>Kaydediliyor…</span>
+          } @else {
+            <mat-icon>save</mat-icon>
+            Sepeti Kaydet
+          }
+        </button>
+        <a mat-button routerLink="/transactions">İptal</a>
+      </div>
     </div>
-  </form>
+
+    <!-- ─── RIGHT: Live Summary ─── -->
+    <aside class="basket-sidebar">
+      <mat-card class="summary-card">
+        <mat-card-header>
+          <div class="summary-header">
+            <mat-icon class="summary-icon">receipt_long</mat-icon>
+            <div>
+              <mat-card-title>Sepet Özeti</mat-card-title>
+              <mat-card-subtitle>Canlı hesaplama</mat-card-subtitle>
+            </div>
+          </div>
+        </mat-card-header>
+        <mat-card-content>
+          <!-- Total Buy -->
+          <div class="summary-section">
+            <h3 class="summary-section-title summary-section-title--buy">
+              <mat-icon>add_shopping_cart</mat-icon> Toplam Alış
+            </h3>
+            <div class="summary-row">
+              <span class="summary-label">Altın</span>
+              <span class="summary-value">{{ totalBuy().hasGram | number:'1.2-2' }} gr</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Nakit</span>
+              <span class="summary-value">{{ totalBuy().cash | number:'1.0-0' }} ₺</span>
+            </div>
+          </div>
+
+          <div class="summary-divider"></div>
+
+          <!-- Total Sell -->
+          <div class="summary-section">
+            <h3 class="summary-section-title summary-section-title--sell">
+              <mat-icon>remove_shopping_cart</mat-icon> Toplam Satış
+            </h3>
+            <div class="summary-row">
+              <span class="summary-label">Altın</span>
+              <span class="summary-value">{{ totalSell().hasGram | number:'1.2-2' }} gr</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Nakit</span>
+              <span class="summary-value">{{ totalSell().cash | number:'1.0-0' }} ₺</span>
+            </div>
+          </div>
+
+          <div class="summary-divider"></div>
+
+          <!-- Net Result -->
+          <div class="summary-section summary-section--net">
+            <h3 class="summary-section-title">
+              <mat-icon>balance</mat-icon> Net Sonuç
+            </h3>
+            <div class="summary-row summary-row--highlight">
+              <span class="summary-label"><strong>Altın (Has Gr)</strong></span>
+              <span class="summary-value summary-value--large"
+                    [ngClass]="{'text-positive': netResult().hasGram > 0, 'text-negative': netResult().hasGram < 0}">
+                {{ netResult().hasGram > 0 ? '+' : '' }}{{ netResult().hasGram | number:'1.2-2' }} gr
+              </span>
+            </div>
+            <div class="summary-row summary-row--highlight">
+              <span class="summary-label"><strong>Nakit (₺)</strong></span>
+              <span class="summary-value summary-value--large"
+                    [ngClass]="{'text-positive': netResult().cash > 0, 'text-negative': netResult().cash < 0}">
+                {{ netResult().cash > 0 ? '+' : '' }}{{ netResult().cash | number:'1.0-0' }} ₺
+              </span>
+            </div>
+          </div>
+
+          <div class="summary-hint">
+            <mat-icon>info</mat-icon>
+            <span>Altın (+) = Kasaya giriş, (−) = Kasadan çıkış</span>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="info-card">
+        <mat-card-content>
+          <mat-icon class="info-icon">lightbulb</mat-icon>
+          <div>
+            <strong>Sepet mantığı:</strong> Aynı müşteri ile yapılan alış ve satış kalemleri netleştirilerek tek atomik işlem olarak kaydedilir.
+          </div>
+        </mat-card-content>
+      </mat-card>
+    </aside>
+  </div>
 </div>

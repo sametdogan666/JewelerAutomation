@@ -10,19 +10,84 @@
     </button>
   </div>
 
-  <div class="balance-card">
-    <mat-card>
+  <!-- Balance Cards -->
+  <div class="balance-cards-grid">
+    <!-- Brüt Kasa -->
+    <mat-card class="balance-card balance-card--physical">
       <mat-card-content>
-        <span class="balance-label">Toplam Has Gram (Ana sermaye)</span>
-        <span class="balance-value">
-          @if (balance() !== null) {
-            {{ balance()! | number:'1.2-2' }} <small>Has Gr</small>
-          } @else if (loading()) {
-            —
-          } @else {
-            —
-          }
-        </span>
+        <div class="balance-header">
+          <mat-icon>inventory_2</mat-icon>
+          <span class="balance-label">Brüt Kasa (Fiziksel)</span>
+        </div>
+        @if (safeStatus()) {
+          <div class="dual-metric">
+            <div class="metric-line">
+              <mat-icon class="metric-icon metric-icon--gold">stars</mat-icon>
+              <span class="metric-val">{{ safeStatus()!.physicalGoldBalance | number:'1.2-2' }}</span>
+              <small>Has Gr</small>
+            </div>
+            <div class="metric-line">
+              <mat-icon class="metric-icon metric-icon--cash">payments</mat-icon>
+              <span class="metric-val metric-val--cash">{{ safeStatus()!.physicalCashBalance | number:'1.0-0' }}</span>
+              <small>₺</small>
+            </div>
+          </div>
+        } @else {
+          <span class="balance-value">—</span>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Net Pozisyon -->
+    <mat-card class="balance-card balance-card--net">
+      <mat-card-content>
+        <div class="balance-header">
+          <mat-icon>account_balance</mat-icon>
+          <span class="balance-label">Net Pozisyon</span>
+        </div>
+        @if (safeStatus()) {
+          <div class="dual-metric">
+            <div class="metric-line">
+              <mat-icon class="metric-icon metric-icon--gold">stars</mat-icon>
+              <span class="metric-val">{{ safeStatus()!.netGoldPosition | number:'1.2-2' }}</span>
+              <small>Has Gr</small>
+            </div>
+            <div class="metric-line">
+              <mat-icon class="metric-icon metric-icon--cash">payments</mat-icon>
+              <span class="metric-val metric-val--cash">{{ safeStatus()!.netCashPosition | number:'1.0-0' }}</span>
+              <small>₺</small>
+            </div>
+          </div>
+          <div class="net-hint">Kasa + Alacaklar − Borçlar</div>
+        } @else {
+          <span class="balance-value">—</span>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Altın Açığı / Fazlası (Trading Position) -->
+    <mat-card class="balance-card balance-card--gap">
+      <mat-card-content>
+        <div class="balance-header">
+          <mat-icon>{{ gapIcon() }}</mat-icon>
+          <span class="balance-label">Alış-Satış Pozisyonu</span>
+        </div>
+        @if (safeStatus()) {
+          <span class="balance-value" [class.text-positive]="safeStatus()!.goldGapOrSurplus > 0.001" [class.text-negative]="safeStatus()!.goldGapOrSurplus < -0.001">
+            {{ safeStatus()!.goldGapOrSurplus > 0 ? '+' : '' }}{{ safeStatus()!.goldGapOrSurplus | number:'1.2-2' }} <small>Has Gr</small>
+          </span>
+          <div class="gap-hint">
+            @if (safeStatus()!.goldGapOrSurplus > 0.001) {
+              Alışlar satışlardan fazla (fazla)
+            } @else if (safeStatus()!.goldGapOrSurplus < -0.001) {
+              Satışlar alışlardan fazla (açık)
+            } @else {
+              Alış-satış dengeli
+            }
+          </div>
+        } @else {
+          <span class="balance-value">—</span>
+        }
       </mat-card-content>
     </mat-card>
   </div>

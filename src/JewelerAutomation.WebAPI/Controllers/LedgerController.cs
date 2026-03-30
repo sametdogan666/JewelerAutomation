@@ -87,6 +87,16 @@ public class LedgerController : ControllerBase
     public async Task<ActionResult> MigrateExistingData(CancellationToken cancellationToken)
     {
         await _migrationService.MigrateExistingDataToLedgerAsync(cancellationToken).ConfigureAwait(false);
-        return Ok(new { message = "Ledger migration completed successfully" });
+        var balances = await _ledgerService.GetBalancesAsync(cancellationToken).ConfigureAwait(false);
+        return Ok(new { message = "Ledger migration completed", balances });
+    }
+
+    [HttpPost("rebuild")]
+    public async Task<ActionResult> RebuildLedger(CancellationToken cancellationToken)
+    {
+        await _migrationService.RebuildLedgerAsync(cancellationToken).ConfigureAwait(false);
+        var balances = await _ledgerService.GetBalancesAsync(cancellationToken).ConfigureAwait(false);
+        var count = await _unitOfWork.Ledger.CountAsync(cancellationToken).ConfigureAwait(false);
+        return Ok(new { message = "Ledger rebuilt from source data", entryCount = count, balances });
     }
 }

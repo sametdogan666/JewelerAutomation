@@ -18,6 +18,11 @@ public class SafeMovement : BaseEntity
     /// <summary> Gelir / Gider / Ana sermaye girişi vb. </summary>
     public SafeMovementType MovementType { get; set; }
     public Guid? SourceTransactionId { get; set; }
+
+    /// <summary>
+    /// Links this movement to a parent operation (e.g. CashPegging).
+    /// </summary>
+    public Guid? CorrelationId { get; set; }
 }
 
 public enum SafeMovementType

@@ -10,7 +10,7 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { SafeService, SafeMovement, SafeMovementCreate } from '../../core/services/safe.service';
+import { SafeService, SafeMovement, SafeMovementCreate, SafeStatus } from '../../core/services/safe.service';
 import { NgIf, DecimalPipe } from '@angular/common';
 
 const MOVEMENT_TYPES: { value: 0 | 1 | 2 | 3; label: string }[] = [
@@ -44,7 +44,7 @@ export class KasaComponent implements OnInit {
   private api = inject(SafeService);
   private fb = inject(FormBuilder);
 
-  balance = signal<number | null>(null);
+  safeStatus = signal<SafeStatus | null>(null);
   dataSource = new MatTableDataSource<SafeMovement>([]);
   loading = signal(true);
   saving = signal(false);
@@ -69,8 +69,8 @@ export class KasaComponent implements OnInit {
   refresh(): void {
     this.loading.set(true);
     this.doneCount = 0;
-    this.api.getBalance().subscribe({
-      next: (v) => { this.balance.set(v); this.done(); },
+    this.api.getStatus().subscribe({
+      next: (s) => { this.safeStatus.set(s); this.done(); },
       error: () => this.done(),
     });
     this.api.getMovements().subscribe({
@@ -127,6 +127,13 @@ export class KasaComponent implements OnInit {
 
   formatDate(s: string): string {
     return new Date(s).toLocaleDateString('tr-TR');
+  }
+
+  gapIcon(): string {
+    const gap = this.safeStatus()?.goldGapOrSurplus ?? 0;
+    if (gap > 0.001) return 'trending_up';
+    if (gap < -0.001) return 'trending_down';
+    return 'horizontal_rule';
   }
 
   onDelete(movement: SafeMovement): void {

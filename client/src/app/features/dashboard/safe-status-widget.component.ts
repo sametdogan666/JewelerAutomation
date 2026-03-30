@@ -1,70 +1,140 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
-import { DecimalPipe, NgIf, NgClass } from '@angular/common';
+import { DecimalPipe, NgClass } from '@angular/common';
 import { SafeService, SafeStatus } from '../../core/services/safe.service';
 
 @Component({
   selector: 'app-safe-status-widget',
   standalone: true,
-  imports: [MatCardModule, MatIconModule, DecimalPipe, NgIf, NgClass],
+  imports: [MatCardModule, MatIconModule, DecimalPipe, NgClass],
   template: `
-    <mat-card class="safe-status-card">
+    <mat-card class="safe-widget">
       <mat-card-header>
         <div class="widget-header">
           <mat-icon class="widget-icon">account_balance_wallet</mat-icon>
-          <h2 class="widget-title">Kasa Durumu</h2>
+          <div>
+            <h2 class="widget-title">Kasa & Finansal Durum</h2>
+            <p class="widget-subtitle">Fiziksel bakiye ve net pozisyon</p>
+          </div>
         </div>
       </mat-card-header>
       <mat-card-content>
         @if (loading()) {
           <div class="loading-state">Yükleniyor...</div>
         } @else if (status()) {
-          <div class="status-grid">
-            <div class="status-item status-item--gold">
-              <mat-icon class="status-icon">stars</mat-icon>
-              <div class="status-info">
-                <div class="status-label">Kasadaki Altın</div>
-                <div class="status-value">{{ status()!.goldBalance | number:'1.2-2' }} <span class="unit">Has Gr</span></div>
-              </div>
-            </div>
+          <div class="sections">
 
-            <div class="status-item status-item--cash">
-              <mat-icon class="status-icon">payments</mat-icon>
-              <div class="status-info">
-                <div class="status-label">Kasadaki Nakit</div>
-                <div class="status-value">{{ status()!.cashBalance | number:'1.2-2' }} <span class="unit">TRY</span></div>
-              </div>
-            </div>
+            <!-- ─── SECTION 1: Physical Balance (Brüt Kasa) ─── -->
+            <div class="section">
+              <h3 class="section-title">
+                <mat-icon>inventory_2</mat-icon>
+                Brüt Kasa
+                <span class="section-hint">Fiziksel bakiye</span>
+              </h3>
 
-            <div class="status-item status-item--expected">
-              <mat-icon class="status-icon">sync_alt</mat-icon>
-              <div class="status-info">
-                <div class="status-label">İşlemlerden Beklenen</div>
-                <div class="status-value">{{ status()!.expectedGold | number:'1.2-2' }} <span class="unit">Has Gr</span></div>
-                <div class="status-hint">Alış-Satış net etkisi</div>
-              </div>
-            </div>
-
-            <div class="status-item" [ngClass]="shortageClass()">
-              <mat-icon class="status-icon">{{ shortageIcon() }}</mat-icon>
-              <div class="status-info">
-                <div class="status-label">Altın Açığı / Fazlası</div>
-                <div class="status-value">{{ status()!.goldShortage | number:'1.2-2' }} <span class="unit">Has Gr</span></div>
-                @if (hasShortage()) {
-                  <div class="shortage-warning">
-                    <mat-icon class="warning-icon">warning</mat-icon>
-                    Altın açığı tespit edildi!
+              <div class="metric-grid">
+                <div class="metric metric--primary">
+                  <div class="metric-icon gold"><mat-icon>stars</mat-icon></div>
+                  <div class="metric-body">
+                    <span class="metric-label">Altın</span>
+                    <span class="metric-value">{{ status()!.physicalGoldBalance | number:'1.2-2' }} <small>Has Gr</small></span>
                   </div>
-                }
-                @if (hasSurplus()) {
-                  <div class="surplus-info">
-                    <mat-icon class="info-icon">check_circle</mat-icon>
-                    Altın fazlası mevcut
+                </div>
+
+                <div class="metric metric--primary">
+                  <div class="metric-icon cash"><mat-icon>payments</mat-icon></div>
+                  <div class="metric-body">
+                    <span class="metric-label">Nakit</span>
+                    <span class="metric-value">{{ status()!.physicalCashBalance | number:'1.2-2' }} <small>₺</small></span>
                   </div>
-                }
+                </div>
+
+                <div class="metric" [ngClass]="gapClass()">
+                  <div class="metric-icon gap"><mat-icon>{{ gapIcon() }}</mat-icon></div>
+                  <div class="metric-body">
+                    <span class="metric-label">Alış-Satış Pozisyonu</span>
+                    <span class="metric-value">{{ status()!.goldGapOrSurplus >= 0 ? '+' : '' }}{{ status()!.goldGapOrSurplus | number:'1.2-2' }} <small>Has Gr</small></span>
+                    @if (status()!.goldGapOrSurplus > 0.001) {
+                      <span class="metric-badge badge--surplus">
+                        <mat-icon>check_circle</mat-icon> Alış Fazlası
+                      </span>
+                    } @else if (status()!.goldGapOrSurplus < -0.001) {
+                      <span class="metric-badge badge--shortage">
+                        <mat-icon>warning</mat-icon> Satış Açığı
+                      </span>
+                    }
+                  </div>
+                </div>
               </div>
             </div>
+
+            <!-- ─── SECTION 2: Net Position (Finansal Durum) ─── -->
+            <div class="section">
+              <h3 class="section-title">
+                <mat-icon>account_balance</mat-icon>
+                Finansal Durum
+                <span class="section-hint">Kasa + Alacaklar − Borçlar</span>
+              </h3>
+
+              <!-- Net Position highlight -->
+              <div class="net-position-card">
+                <div class="net-icon"><mat-icon>trending_up</mat-icon></div>
+                <div class="net-body">
+                  <span class="net-label">Net Altın</span>
+                  <span class="net-value">{{ status()!.netGoldPosition | number:'1.2-2' }} <small>Has Gr</small></span>
+                </div>
+              </div>
+              <div class="net-position-card net-position-card--cash">
+                <div class="net-icon net-icon--cash"><mat-icon>payments</mat-icon></div>
+                <div class="net-body">
+                  <span class="net-label">Net Nakit</span>
+                  <span class="net-value">{{ status()!.netCashPosition | number:'1.0-0' }} <small>₺</small></span>
+                </div>
+              </div>
+
+              <div class="debt-grid">
+                <div class="debt-item">
+                  <mat-icon class="debt-icon receivable">store</mat-icon>
+                  <div class="debt-body">
+                    <span class="debt-label">Carilerden Alacak</span>
+                    <span class="debt-value">+{{ status()!.customerGoldReceivable | number:'1.2-2' }}</span>
+                  </div>
+                </div>
+                <div class="debt-item">
+                  <mat-icon class="debt-icon debt">business</mat-icon>
+                  <div class="debt-body">
+                    <span class="debt-label">Carilere Borç</span>
+                    <span class="debt-value">−{{ status()!.customerGoldDebt | number:'1.2-2' }}</span>
+                  </div>
+                </div>
+                <div class="debt-item">
+                  <mat-icon class="debt-icon receivable">people_alt</mat-icon>
+                  <div class="debt-body">
+                    <span class="debt-label">Şahıslardan Alacak</span>
+                    <span class="debt-value">+{{ status()!.personalGoldReceivable | number:'1.2-2' }}</span>
+                  </div>
+                </div>
+                <div class="debt-item">
+                  <mat-icon class="debt-icon debt">person</mat-icon>
+                  <div class="debt-body">
+                    <span class="debt-label">Şahıslara Borç</span>
+                    <span class="debt-value">−{{ status()!.personalGoldDebt | number:'1.2-2' }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Profit (reporting only) -->
+              <div class="profit-strip" [ngClass]="profitClass()">
+                <mat-icon>{{ status()!.profitHasGram >= 0 ? 'trending_up' : 'trending_down' }}</mat-icon>
+                <span class="profit-label">Kâr / Zarar</span>
+                <span class="profit-value">
+                  {{ status()!.profitHasGram >= 0 ? '+' : '' }}{{ status()!.profitHasGram | number:'1.2-2' }} Has Gr
+                </span>
+                <span class="profit-hint">(performans göstergesi)</span>
+              </div>
+            </div>
+
           </div>
         } @else {
           <div class="error-state">Veri yüklenemedi.</div>
@@ -73,7 +143,7 @@ import { SafeService, SafeStatus } from '../../core/services/safe.service';
     </mat-card>
   `,
   styles: [`
-    .safe-status-card {
+    .safe-widget {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
       border-radius: 16px;
@@ -86,155 +156,125 @@ import { SafeService, SafeStatus } from '../../core/services/safe.service';
       gap: 0.75rem;
       padding: 0.5rem 0;
     }
+    .widget-icon { font-size: 2rem; width: 2rem; height: 2rem; color: rgba(255,255,255,.9); }
+    .widget-title { margin: 0; font-size: 1.5rem; font-weight: 600; color: white; }
+    .widget-subtitle { margin: .25rem 0 0; font-size: .85rem; color: rgba(255,255,255,.7); }
 
-    .widget-icon {
-      font-size: 2rem;
-      width: 2rem;
-      height: 2rem;
-      color: rgba(255, 255, 255, 0.9);
+    .sections { display: flex; flex-direction: column; gap: 1.5rem; margin-top: 1rem; }
+
+    /* ── Section title ── */
+    .section-title {
+      display: flex; align-items: center; gap: .5rem;
+      margin: 0 0 .75rem; font-size: 1rem; font-weight: 600; color: rgba(255,255,255,.95);
+      mat-icon { font-size: 1.25rem; width: 1.25rem; height: 1.25rem; }
+    }
+    .section-hint {
+      font-size: .75rem; font-weight: 400; color: rgba(255,255,255,.55);
+      margin-left: auto;
     }
 
-    .widget-title {
-      margin: 0;
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: white;
-    }
-
-    .status-grid {
+    /* ── Metric grid (Physical) ── */
+    .metric-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 1rem;
-      margin-top: 1.5rem;
+      grid-template-columns: 1fr 1fr;
+      gap: .75rem;
     }
-
-    .status-item {
-      background: rgba(255, 255, 255, 0.15);
-      backdrop-filter: blur(10px);
-      border-radius: 12px;
-      padding: 1.25rem;
-      display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-      transition: all 0.3s ease;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+    .metric {
+      background: rgba(255,255,255,.12);
+      border-radius: 10px; padding: 1rem;
+      display: flex; align-items: flex-start; gap: .75rem;
+      border: 1px solid rgba(255,255,255,.15);
+      transition: background .2s;
     }
+    .metric:hover { background: rgba(255,255,255,.18); }
+    .metric--primary {}
+    .metric:last-child { grid-column: span 2; }
 
-    .status-item:hover {
-      background: rgba(255, 255, 255, 0.2);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    .metric-icon {
+      width: 38px; height: 38px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      mat-icon { font-size: 1.25rem; width: 1.25rem; height: 1.25rem; color: white; }
     }
+    .metric-icon.gold { background: linear-gradient(135deg,#ffa000,#ffc107); }
+    .metric-icon.cash { background: linear-gradient(135deg,#2e7d32,#4caf50); }
+    .metric-icon.gap  { background: linear-gradient(135deg,#1565c0,#42a5f5); }
 
-    .status-item--gold {
-      border-left: 4px solid #ffd700;
+    .metric-body { flex: 1; display: flex; flex-direction: column; gap: .2rem; }
+    .metric-label { font-size: .75rem; color: rgba(255,255,255,.7); text-transform: uppercase; letter-spacing: .5px; }
+    .metric-value { font-size: 1.4rem; font-weight: 700; color: white; small { font-size: .8rem; font-weight: 500; color: rgba(255,255,255,.7); } }
+
+    .metric-badge {
+      display: inline-flex; align-items: center; gap: .25rem;
+      font-size: .75rem; font-weight: 600; padding: .2rem .5rem; border-radius: 6px; margin-top: .25rem; width: fit-content;
+      mat-icon { font-size: 1rem; width: 1rem; height: 1rem; }
     }
+    .badge--surplus { background: rgba(76,175,80,.35); color: #c8e6c9; }
+    .badge--shortage { background: rgba(244,67,54,.35); color: #ffcdd2; }
 
-    .status-item--cash {
-      border-left: 4px solid #4caf50;
+    .metric--shortage { border-color: rgba(244,67,54,.5); }
+    .metric--surplus  { border-color: rgba(76,175,80,.5); }
+
+    /* ── Net position card ── */
+    .net-position-card {
+      background: rgba(255,255,255,.18);
+      border: 2px solid rgba(255,255,255,.25);
+      border-radius: 12px; padding: 1.25rem; margin-bottom: .75rem;
+      display: flex; align-items: center; gap: 1rem;
     }
-
-    .status-item--expected {
-      border-left: 4px solid #2196f3;
+    .net-position-card--cash {
+      border-color: rgba(76,175,80,.4);
     }
-
-    .status-item--shortage {
-      border-left: 4px solid #f44336;
-      background: rgba(244, 67, 54, 0.2);
+    .net-icon {
+      width: 50px; height: 50px; border-radius: 10px;
+      background: rgba(255,255,255,.2);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      mat-icon { font-size: 1.75rem; width: 1.75rem; height: 1.75rem; color: white; }
     }
-
-    .status-item--surplus {
-      border-left: 4px solid #4caf50;
-      background: rgba(76, 175, 80, 0.2);
+    .net-icon--cash {
+      background: rgba(76,175,80,.3);
     }
+    .net-body { flex: 1; display: flex; flex-direction: column; gap: .35rem; }
+    .net-label { font-size: .8rem; color: rgba(255,255,255,.8); text-transform: uppercase; letter-spacing: .8px; }
+    .net-value { font-size: 1.75rem; font-weight: 700; color: white; small { font-size: .9rem; color: rgba(255,255,255,.7); } }
 
-    .status-icon {
-      font-size: 2.5rem;
-      width: 2.5rem;
-      height: 2.5rem;
-      color: rgba(255, 255, 255, 0.9);
-      flex-shrink: 0;
+    /* ── Debt / Receivable grid ── */
+    .debt-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;
     }
-
-    .status-info {
-      flex: 1;
+    .debt-item {
+      background: rgba(255,255,255,.08); border-radius: 8px; padding: .75rem;
+      display: flex; align-items: center; gap: .6rem;
     }
-
-    .status-label {
-      font-size: 0.875rem;
-      color: rgba(255, 255, 255, 0.8);
-      margin-bottom: 0.5rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-weight: 500;
+    .debt-icon {
+      font-size: 1.25rem; width: 1.25rem; height: 1.25rem;
+      &.receivable { color: #81c784; }
+      &.debt { color: #ef9a9a; }
     }
+    .debt-body { flex: 1; display: flex; flex-direction: column; gap: .1rem; }
+    .debt-label { font-size: .7rem; color: rgba(255,255,255,.6); text-transform: uppercase; }
+    .debt-value { font-size: 1rem; font-weight: 600; color: white; }
 
-    .status-hint {
-      font-size: 0.75rem;
-      color: rgba(255, 255, 255, 0.6);
-      margin-top: 0.25rem;
-      font-style: italic;
+    /* ── Profit strip ── */
+    .profit-strip {
+      display: flex; align-items: center; gap: .5rem;
+      margin-top: .75rem; padding: .6rem .75rem; border-radius: 8px;
+      background: rgba(255,255,255,.1); font-size: .875rem;
+      mat-icon { font-size: 1.25rem; width: 1.25rem; height: 1.25rem; }
     }
+    .profit-strip.profit--gain  { background: rgba(76,175,80,.2);  color: #c8e6c9; }
+    .profit-strip.profit--loss  { background: rgba(244,67,54,.2); color: #ffcdd2; }
+    .profit-label { font-weight: 600; }
+    .profit-value { margin-left: auto; font-weight: 700; }
+    .profit-hint  { font-size: .7rem; color: rgba(255,255,255,.5); margin-left: .25rem; }
 
-    .status-value {
-      font-size: 1.75rem;
-      font-weight: 700;
-      color: white;
-      line-height: 1.2;
-    }
-
-    .unit {
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: rgba(255, 255, 255, 0.7);
-      margin-left: 0.25rem;
-    }
-
-    .shortage-warning {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-top: 0.75rem;
-      padding: 0.5rem 0.75rem;
-      background: rgba(244, 67, 54, 0.3);
-      border-radius: 8px;
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: #ffebee;
-    }
-
-    .surplus-info {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin-top: 0.75rem;
-      padding: 0.5rem 0.75rem;
-      background: rgba(76, 175, 80, 0.3);
-      border-radius: 8px;
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: #e8f5e9;
-    }
-
-    .warning-icon,
-    .info-icon {
-      font-size: 1.25rem;
-      width: 1.25rem;
-      height: 1.25rem;
-    }
-
-    .loading-state,
-    .error-state {
-      text-align: center;
-      padding: 2rem;
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 1rem;
+    .loading-state, .error-state {
+      text-align: center; padding: 2rem; color: rgba(255,255,255,.8);
     }
 
     @media (max-width: 768px) {
-      .status-grid {
-        grid-template-columns: 1fr;
-      }
+      .metric-grid { grid-template-columns: 1fr; }
+      .metric:last-child { grid-column: span 1; }
+      .debt-grid { grid-template-columns: 1fr; }
     }
   `]
 })
@@ -251,33 +291,27 @@ export class SafeStatusWidgetComponent implements OnInit {
   loadStatus(): void {
     this.loading.set(true);
     this.safeService.getStatus().subscribe({
-      next: (data) => {
-        this.status.set(data);
-        this.loading.set(false);
-      },
-      error: () => {
-        this.loading.set(false);
-      }
+      next: (data) => { this.status.set(data); this.loading.set(false); },
+      error: () => this.loading.set(false)
     });
   }
 
-  hasShortage(): boolean {
-    return this.status()?.goldShortage ? this.status()!.goldShortage > 0 : false;
-  }
-
-  hasSurplus(): boolean {
-    return this.status()?.goldShortage ? this.status()!.goldShortage < 0 : false;
-  }
-
-  shortageClass(): string {
-    if (this.hasShortage()) return 'status-item--shortage';
-    if (this.hasSurplus()) return 'status-item--surplus';
+  gapClass(): string {
+    const gap = this.status()?.goldGapOrSurplus ?? 0;
+    if (gap > 0.001) return 'metric--surplus';
+    if (gap < -0.001) return 'metric--shortage';
     return '';
   }
 
-  shortageIcon(): string {
-    if (this.hasShortage()) return 'trending_down';
-    if (this.hasSurplus()) return 'trending_up';
+  gapIcon(): string {
+    const gap = this.status()?.goldGapOrSurplus ?? 0;
+    if (gap > 0.001) return 'trending_up';
+    if (gap < -0.001) return 'trending_down';
     return 'horizontal_rule';
+  }
+
+  profitClass(): string {
+    const p = this.status()?.profitHasGram ?? 0;
+    return p >= 0 ? 'profit--gain' : 'profit--loss';
   }
 }

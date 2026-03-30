@@ -127,4 +127,11 @@ using (var scope = app.Services.CreateScope())
 await SeedData.SeedAdminUserAsync(app.Services).ConfigureAwait(false);
 await SeedData.SeedSampleDataAsync(app.Services).ConfigureAwait(false);
 
+// Ledger: rebuild from source data on every startup to ensure consistency
+using (var scope = app.Services.CreateScope())
+{
+    var migrationService = scope.ServiceProvider.GetRequiredService<ILedgerMigrationService>();
+    await migrationService.RebuildLedgerAsync().ConfigureAwait(false);
+}
+
 app.Run();

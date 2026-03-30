@@ -43,9 +43,12 @@ export class TransactionsListComponent implements OnInit {
   dataSource = new MatTableDataSource<Transaction>([]);
   loading = signal(true);
   deleting = signal<string | null>(null);
-  displayedColumns: string[] = ['transactionDate', 'direction', 'quantity', 'milyem', 'hasGram', 'price', 'customer', 'description', 'actions'];
+  expandedRow = signal<string | null>(null);
+  displayedColumns: string[] = [
+    'transactionDate', 'itemCount', 'direction', 'netHasGram', 'netCashAmount',
+    'customer', 'description', 'actions'
+  ];
 
-  // Date filter
   dateFilterType = new FormControl<'all' | 'today' | 'week' | 'custom'>('all');
   dateRangeForm = new FormGroup({
     startDate: new FormControl<Date | null>(null),
@@ -54,8 +57,6 @@ export class TransactionsListComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadData();
-    
-    // Watch for filter changes
     this.dateFilterType.valueChanges.subscribe((type) => {
       this.onDateFilterChange(type || 'all');
     });
@@ -65,19 +66,11 @@ export class TransactionsListComponent implements OnInit {
     this.loading.set(true);
     this.api.getAll(params).subscribe({
       next: (list) => {
-        console.log('[TRANSACTIONS] Data received:', list);
-        console.log('[TRANSACTIONS] First item price:', list[0]?.price);
-        console.log('[TRANSACTIONS] Displayed columns:', this.displayedColumns);
-        console.log('[TRANSACTIONS] Filter params:', params);
         this.dataSource.data = list;
         this.loading.set(false);
-        // Force change detection for table rendering
         this.cdr.detectChanges();
       },
-      error: (err) => {
-        console.error('[TRANSACTIONS] Error loading data:', err);
-        this.loading.set(false);
-      },
+      error: () => this.loading.set(false),
     });
   }
 
@@ -86,45 +79,30 @@ export class TransactionsListComponent implements OnInit {
     let params: { from?: string; to?: string } | undefined;
 
     switch (type) {
-      case 'today':
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-        params = {
-          from: todayStart.toISOString(),
-          to: todayEnd.toISOString(),
-        };
+      case 'today': {
+        const s = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const e = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+        params = { from: s.toISOString(), to: e.toISOString() };
         break;
-      case 'week':
-        const weekStart = new Date(now);
-        weekStart.setDate(now.getDate() - 7);
-        params = {
-          from: weekStart.toISOString(),
-          to: now.toISOString(),
-        };
+      }
+      case 'week': {
+        const ws = new Date(now);
+        ws.setDate(now.getDate() - 7);
+        params = { from: ws.toISOString(), to: now.toISOString() };
         break;
+      }
       case 'custom':
-        // Custom range will be applied when user clicks "Uygula" button
         return;
-      case 'all':
       default:
         params = undefined;
-        break;
     }
-
     this.loadData(params);
   }
 
   applyCustomDateRange(): void {
-    const startDate = this.dateRangeForm.value.startDate;
-    const endDate = this.dateRangeForm.value.endDate;
-
-    if (startDate && endDate) {
-      const params = {
-        from: startDate.toISOString(),
-        to: endDate.toISOString(),
-      };
-      this.loadData(params);
-    }
+    const s = this.dateRangeForm.value.startDate;
+    const e = this.dateRangeForm.value.endDate;
+    if (s && e) this.loadData({ from: s.toISOString(), to: e.toISOString() });
   }
 
   clearCustomDateRange(): void {
@@ -132,23 +110,29 @@ export class TransactionsListComponent implements OnInit {
     this.dateFilterType.setValue('all');
   }
 
-  directionLabel(d: TransactionDirection): string {
-    return d === 0 ? 'Satış' : 'Alış';
+  netLabel(tx: Transaction): string {
+    if (tx.netHasGram > 0) return 'Alış (Net)';
+    if (tx.netHasGram < 0) return 'Satış (Net)';
+    return 'Dengeli';
   }
 
   formatDate(s: string): string {
     return new Date(s).toLocaleDateString('tr-TR');
   }
 
-  onDelete(transaction: Transaction): void {
-    if (!confirm(`"${transaction.description || 'Bu işlem'}" kaydını silmek istediğinizden emin misiniz? İlişkili kasa hareketi de silinecektir.`)) {
+  toggleExpand(tx: Transaction): void {
+    this.expandedRow.set(this.expandedRow() === tx.id ? null : tx.id);
+  }
+
+  onDelete(tx: Transaction): void {
+    if (!confirm(`"${tx.description || 'Bu sepet'}" kaydını silmek istediğinizden emin misiniz? Tüm kalemler ve kasa hareketleri de silinecektir.`)) {
       return;
     }
-    this.deleting.set(transaction.id);
-    this.api.delete(transaction.id).subscribe({
+    this.deleting.set(tx.id);
+    this.api.delete(tx.id).subscribe({
       next: () => {
         this.deleting.set(null);
-        this.dataSource.data = this.dataSource.data.filter(t => t.id !== transaction.id);
+        this.dataSource.data = this.dataSource.data.filter(t => t.id !== tx.id);
         this.cdr.detectChanges();
       },
       error: () => {

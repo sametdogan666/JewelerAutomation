@@ -14,12 +14,18 @@ public class SafeController : ControllerBase
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAccountingService _accounting;
     private readonly ISafeStatusService _safeStatus;
+    private readonly ILedgerService _ledger;
 
-    public SafeController(IUnitOfWork unitOfWork, IAccountingService accounting, ISafeStatusService safeStatus)
+    public SafeController(
+        IUnitOfWork unitOfWork,
+        IAccountingService accounting,
+        ISafeStatusService safeStatus,
+        ILedgerService ledger)
     {
         _unitOfWork = unitOfWork;
         _accounting = accounting;
         _safeStatus = safeStatus;
+        _ledger = ledger;
     }
 
     [HttpGet("balance")]
@@ -53,6 +59,16 @@ public class SafeController : ControllerBase
             MovementType = dto.MovementType
         };
         await _unitOfWork.SafeMovements.AddAsync(entity, cancellationToken).ConfigureAwait(false);
+
+        await _ledger.RecordSafeMovementAsync(
+            transactionDate: dto.TransactionDate,
+            movementType: dto.MovementType,
+            goldHasAmount: hasGram,
+            referenceId: entity.Id,
+            description: dto.Description,
+            cancellationToken: cancellationToken
+        ).ConfigureAwait(false);
+
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return CreatedAtAction(nameof(GetMovements), null, entity);
     }
@@ -63,13 +79,19 @@ public class SafeController : ControllerBase
     [HttpGet("status")]
     public async Task<ActionResult<SafeStatusDto>> GetStatus(CancellationToken cancellationToken)
     {
-        var status = await _safeStatus.GetSafeStatusAsync(cancellationToken).ConfigureAwait(false);
+        var s = await _safeStatus.GetSafeStatusAsync(cancellationToken).ConfigureAwait(false);
         return Ok(new SafeStatusDto(
-            status.GoldBalance,
-            status.CashBalance,
-            status.ExpectedGold,
-            status.ActualGold,
-            status.GoldShortage
+            s.PhysicalGoldBalance,
+            s.PhysicalCashBalance,
+            s.ExpectedGold,
+            s.GoldGapOrSurplus,
+            s.CustomerGoldDebt,
+            s.CustomerGoldReceivable,
+            s.PersonalGoldDebt,
+            s.PersonalGoldReceivable,
+            s.NetGoldPosition,
+            s.NetCashPosition,
+            s.ProfitHasGram
         ));
     }
 
@@ -82,7 +104,6 @@ public class SafeController : ControllerBase
         var movement = await _unitOfWork.SafeMovements.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (movement == null) return NotFound();
 
-        // Transaction'dan otomatik oluşan hareketler düzenlenemez
         if (movement.SourceTransactionId != null)
             return BadRequest("Transaction'dan oluşan hareketler düzenlenemez.");
 
@@ -95,8 +116,21 @@ public class SafeController : ControllerBase
         movement.MovementType = dto.MovementType;
 
         _unitOfWork.SafeMovements.Update(movement);
-        await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
+        await _ledger.DeleteEntriesByReferenceAsync(
+            LedgerReferenceType.SafeMovement, id, cancellationToken
+        ).ConfigureAwait(false);
+
+        await _ledger.RecordSafeMovementAsync(
+            transactionDate: dto.TransactionDate,
+            movementType: dto.MovementType,
+            goldHasAmount: hasGram,
+            referenceId: id,
+            description: dto.Description,
+            cancellationToken: cancellationToken
+        ).ConfigureAwait(false);
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return Ok(movement);
     }
 
@@ -109,9 +143,12 @@ public class SafeController : ControllerBase
         var movement = await _unitOfWork.SafeMovements.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (movement == null) return NotFound();
 
-        // Transaction'dan otomatik oluşan hareketler silinemez
         if (movement.SourceTransactionId != null)
             return BadRequest("Transaction'dan oluşan hareketler silinemez. Önce transaction'ı siliniz.");
+
+        await _ledger.DeleteEntriesByReferenceAsync(
+            LedgerReferenceType.SafeMovement, id, cancellationToken
+        ).ConfigureAwait(false);
 
         _unitOfWork.SafeMovements.Delete(movement);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -123,9 +160,15 @@ public class SafeController : ControllerBase
 public record SafeMovementCreateDto(DateTime TransactionDate, decimal Gram, decimal Milyem, string? Description, SafeMovementType MovementType);
 
 public record SafeStatusDto(
-    decimal GoldBalance,
-    decimal CashBalance,
+    decimal PhysicalGoldBalance,
+    decimal PhysicalCashBalance,
     decimal ExpectedGold,
-    decimal ActualGold,
-    decimal GoldShortage
+    decimal GoldGapOrSurplus,
+    decimal CustomerGoldDebt,
+    decimal CustomerGoldReceivable,
+    decimal PersonalGoldDebt,
+    decimal PersonalGoldReceivable,
+    decimal NetGoldPosition,
+    decimal NetCashPosition,
+    decimal ProfitHasGram
 );

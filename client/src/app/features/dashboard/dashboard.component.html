@@ -7,92 +7,13 @@
     <p class="page-subtitle">DOĞAN KUYUMCULUK - Anlık durum ve finans analizi</p>
   </div>
 
-  <!-- Main Widgets Grid (4 Widget) -->
+  <!-- Main Widgets Grid -->
   <div class="main-widgets-grid">
-    <!-- Kasa Durumu Widget -->
+    <!-- Kasa & Finansal Durum Widget -->
     <app-safe-status-widget></app-safe-status-widget>
-    
-    <!-- Kar Analizi Widget -->
+
+    <!-- Kâr Analizi Widget -->
     <app-profit-widget></app-profit-widget>
-    
-    <!-- Sermaye & Hesaplar Widget -->
-    <mat-card class="capital-widget">
-      <mat-card-header>
-        <div class="widget-header">
-          <mat-icon class="widget-icon">account_balance</mat-icon>
-          <div>
-            <h2 class="widget-title">Sermaye & Hesaplar</h2>
-            <p class="widget-subtitle">Net sermaye ve cari/şahıs bakiyeleri</p>
-          </div>
-        </div>
-      </mat-card-header>
-      <mat-card-content>
-        @if (loading()) {
-          <div class="loading-state">Yükleniyor...</div>
-        } @else if (capitalSummary()) {
-          <div class="capital-grid">
-            <!-- Net Sermaye - Büyük -->
-            <div class="capital-main">
-              <div class="capital-main-icon">
-                <mat-icon>trending_up</mat-icon>
-              </div>
-              <div class="capital-main-content">
-                <span class="capital-main-label">Net Sermaye</span>
-                <span class="capital-main-value">{{ capitalSummary()!.netGoldCapital | number:'1.2-2' }} <small>Has Gr</small></span>
-              </div>
-            </div>
-
-            <!-- Detay Kartları -->
-            <div class="capital-details">
-              <!-- Kasadaki Altın -->
-              <div class="capital-item">
-                <mat-icon class="item-icon gold">stars</mat-icon>
-                <div class="item-content">
-                  <span class="item-label">Kasadaki Altın</span>
-                  <span class="item-value">{{ capitalSummary()!.totalGoldInSafe | number:'1.2-2' }} Has Gr</span>
-                </div>
-              </div>
-
-              <!-- Cari Borç -->
-              <div class="capital-item">
-                <mat-icon class="item-icon debt">business</mat-icon>
-                <div class="item-content">
-                  <span class="item-label">Carilere Borç</span>
-                  <span class="item-value">{{ capitalSummary()!.totalCustomerGoldDebt | number:'1.2-2' }} Has Gr</span>
-                </div>
-              </div>
-
-              <!-- Cari Alacak -->
-              <div class="capital-item">
-                <mat-icon class="item-icon receivable">store</mat-icon>
-                <div class="item-content">
-                  <span class="item-label">Carilerden Alacak</span>
-                  <span class="item-value">{{ capitalSummary()!.totalCustomerGoldReceivable | number:'1.2-2' }} Has Gr</span>
-                </div>
-              </div>
-
-              <!-- Şahıs Borç -->
-              <div class="capital-item">
-                <mat-icon class="item-icon personal-debt">person</mat-icon>
-                <div class="item-content">
-                  <span class="item-label">Şahıslara Borç</span>
-                  <span class="item-value">{{ capitalSummary()!.totalPersonalGoldDebt | number:'1.2-2' }} Has Gr</span>
-                </div>
-              </div>
-
-              <!-- Şahıs Alacak -->
-              <div class="capital-item">
-                <mat-icon class="item-icon personal-receivable">people_alt</mat-icon>
-                <div class="item-content">
-                  <span class="item-label">Şahıslardan Alacak</span>
-                  <span class="item-value">{{ capitalSummary()!.totalPersonalGoldReceivable | number:'1.2-2' }} Has Gr</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        }
-      </mat-card-content>
-    </mat-card>
 
     <!-- Hızlı Erişim Widget -->
     <mat-card class="quick-actions-widget">

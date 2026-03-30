@@ -1,6 +1,6 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { Router, RouterLink, ActivatedRoute } from '@angular/router';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormArray, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -9,13 +9,29 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { DecimalPipe, DatePipe } from '@angular/common';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { DecimalPipe, DatePipe, NgClass } from '@angular/common';
 import { NgxMaskDirective } from 'ngx-mask';
-import { TransactionsService, TransactionCreate, TransactionDirection } from '../../core/services/transactions.service';
+import {
+  TransactionsService,
+  BasketCreate,
+  BasketItemCreate,
+  TransactionDirection,
+} from '../../core/services/transactions.service';
 import { CustomersService, Customer } from '../../core/services/customers.service';
 
 const MILYEM_FACTOR = 0.001;
 const LABOUR_FACTOR = 0.01;
+
+interface ItemSummary {
+  direction: 'Satış' | 'Alış';
+  quantity: number;
+  milyem: number;
+  hasGram: number;
+  price: number;
+  totalValue: number;
+  description: string;
+}
 
 @Component({
   selector: 'app-transaction-form',
@@ -31,8 +47,10 @@ const LABOUR_FACTOR = 0.01;
     MatIconModule,
     MatRadioModule,
     MatProgressSpinnerModule,
+    MatTooltipModule,
     DecimalPipe,
     DatePipe,
+    NgClass,
     NgxMaskDirective,
   ],
   templateUrl: './transaction-form.component.html',
@@ -50,88 +68,47 @@ export class TransactionFormComponent implements OnInit {
   editMode = signal(false);
   transactionId = signal<string | null>(null);
 
-  form = this.fb.nonNullable.group({
-    direction: [0 as TransactionDirection, Validators.required],
+  headerForm = this.fb.nonNullable.group({
     transactionDate: [new Date().toISOString().slice(0, 10), Validators.required],
-    quantity: [0, [Validators.required, Validators.min(0.001)]],
-    milyem: [916, [Validators.required, Validators.min(0), Validators.max(1000)]],
-    pieceCount: [0],
-    unitLabour: [0],
-    price: [0 as number | null],
     description: [''],
     customerId: [null as string | null],
   });
 
-  /** Snapshot of form values for reactive preview (updated on valueChanges) */
-  formSnapshot = signal(this.form.getRawValue());
+  itemsArray = this.fb.array<FormGroup>([]);
 
-  /** Live preview: Has Gram from purity (quantity * milyem / 1000) */
-  hasFromPurity = computed(() => {
-    const s = this.formSnapshot();
-    const q = s.quantity ?? 0;
-    const m = s.milyem ?? 0;
-    return Math.round((q * m * MILYEM_FACTOR) * 1e6) / 1e6;
+  /** Reactive snapshot of items for computed summaries */
+  itemsSnapshot = signal<any[]>([]);
+
+  totalBuy = computed(() => {
+    const items = this.itemsSnapshot();
+    let has = 0, cash = 0;
+    for (const it of items) {
+      if (it.direction === 1) {
+        has += this.calcHasGram(it);
+        cash += this.parseNum(it.price);
+      }
+    }
+    return { hasGram: Math.round(has * 1e6) / 1e6, cash: Math.round(cash * 100) / 100 };
   });
 
-  /** Live preview: Total labour (sale only, negative) */
-  totalLabourPreview = computed(() => {
-    const s = this.formSnapshot();
-    if (s.direction !== 0) return 0;
-    const pc = s.pieceCount ?? 0;
-    const ul = s.unitLabour ?? 0;
-    const labour = pc * ul * LABOUR_FACTOR;
-    return Math.round(-labour * 1e6) / 1e6;
+  totalSell = computed(() => {
+    const items = this.itemsSnapshot();
+    let has = 0, cash = 0;
+    for (const it of items) {
+      if (it.direction === 0) {
+        has += this.calcHasGram(it);
+        cash += this.parseNum(it.price);
+      }
+    }
+    return { hasGram: Math.round(has * 1e6) / 1e6, cash: Math.round(cash * 100) / 100 };
   });
 
-  /** Live preview: Final Has Gram (with labour for sale) */
-  hasGramPreview = computed(() => {
-    const base = this.hasFromPurity();
-    const labour = this.totalLabourPreview();
-    return Math.round((base + labour) * 1e6) / 1e6;
-  });
-
-  /** Live preview: Total transaction value (quantity * price) */
-  totalTransactionValue = computed(() => {
-    const s = this.formSnapshot();
-    const q = s.quantity ?? 0;
-    const p = s.price ?? 0;
-    if (p === 0 || q === 0) return 0;
-    return Math.round(q * p * 100) / 100;
-  });
-
-  /** Live preview: Milyem labour (only if > 916) */
-  milyemLabourPreview = computed(() => {
-    const s = this.formSnapshot();
-    const m = s.milyem ?? 0;
-    const q = s.quantity ?? 0;
-    if (m <= 916) return 0;
-    return Math.round((m - 916) * q * MILYEM_FACTOR * 1e6) / 1e6;
-  });
-
-  /** Whether form has valid numbers for preview */
-  canShowPreview = computed(() => {
-    const s = this.formSnapshot();
-    const q = s.quantity ?? 0;
-    const m = s.milyem ?? 0;
-    return q > 0 && m >= 0 && m <= 1000;
-  });
-
-  /** Transaction summary data */
-  transactionSummary = computed(() => {
-    if (!this.canShowPreview()) return null;
-    const s = this.formSnapshot();
+  netResult = computed(() => {
+    const buy = this.totalBuy();
+    const sell = this.totalSell();
     return {
-      direction: s.direction === 0 ? 'Satış' : 'Alış',
-      quantity: s.quantity,
-      milyem: s.milyem,
-      hasFromPurity: this.hasFromPurity(),
-      totalLabour: this.totalLabourPreview(),
-      milyemLabour: this.milyemLabourPreview(),
-      finalHasGram: this.hasGramPreview(),
-      price: s.price ?? 0,
-      totalValue: this.totalTransactionValue(),
-      customer: this.customers().find(c => c.id === s.customerId)?.name ?? 'Belirsiz',
-      date: s.transactionDate,
+      hasGram: Math.round((buy.hasGram - sell.hasGram) * 1e6) / 1e6,
+      cash: Math.round((sell.cash - buy.cash) * 100) / 100,
     };
   });
 
@@ -141,60 +118,131 @@ export class TransactionFormComponent implements OnInit {
       this.editMode.set(true);
       this.transactionId.set(id);
       this.transactionsApi.getById(id).subscribe({
-        next: (transaction) => {
-          this.form.patchValue({
-            direction: transaction.direction,
-            transactionDate: new Date(transaction.transactionDate).toISOString().slice(0, 10),
-            quantity: transaction.quantity,
-            milyem: transaction.milyem,
-            pieceCount: transaction.pieceCount ?? 0,
-            unitLabour: transaction.unitLabour ?? 0,
-            price: transaction.price ?? 0,
-            description: transaction.description ?? '',
-            customerId: transaction.customerId ?? null,
+        next: (tx) => {
+          this.headerForm.patchValue({
+            transactionDate: new Date(tx.transactionDate).toISOString().slice(0, 10),
+            description: tx.description ?? '',
+            customerId: tx.customerId ?? null,
           });
-          this.formSnapshot.set(this.form.getRawValue());
+          this.itemsArray.clear();
+          for (const item of tx.items) {
+            this.addItem(item.direction, item.quantity, item.milyem,
+              item.pieceCount ?? 0, item.unitLabour ?? 0,
+              item.price ?? 0, item.description ?? '');
+          }
+          if (tx.items.length === 0) {
+            this.addItem();
+          }
+          this.syncSnapshot();
         },
       });
+    } else {
+      this.addItem();
     }
     this.customersApi.getAll().subscribe((list) => this.customers.set(list));
-    this.form.valueChanges.subscribe(() => this.formSnapshot.set(this.form.getRawValue()));
   }
 
-  get isSale(): boolean {
-    return this.form.get('direction')?.value === 0;
+  createItemGroup(
+    direction: TransactionDirection = 1,
+    quantity = 0,
+    milyem = 916,
+    pieceCount = 0,
+    unitLabour = 0,
+    price: number = 0,
+    description = ''
+  ): FormGroup {
+    const g = this.fb.group({
+      direction: [direction as TransactionDirection, Validators.required],
+      quantity: [quantity, [Validators.required, Validators.min(0.001)]],
+      milyem: [milyem, [Validators.required, Validators.min(0), Validators.max(1000)]],
+      pieceCount: [pieceCount],
+      unitLabour: [unitLabour],
+      price: [price as number | null],
+      description: [description],
+    });
+    g.valueChanges.subscribe(() => this.syncSnapshot());
+    return g;
+  }
+
+  addItem(
+    direction: TransactionDirection = 1,
+    quantity = 0,
+    milyem = 916,
+    pieceCount = 0,
+    unitLabour = 0,
+    price: number = 0,
+    description = ''
+  ): void {
+    this.itemsArray.push(
+      this.createItemGroup(direction, quantity, milyem, pieceCount, unitLabour, price, description)
+    );
+    this.syncSnapshot();
+  }
+
+  removeItem(index: number): void {
+    if (this.itemsArray.length <= 1) return;
+    this.itemsArray.removeAt(index);
+    this.syncSnapshot();
+  }
+
+  private syncSnapshot(): void {
+    this.itemsSnapshot.set(this.itemsArray.controls.map(c => c.getRawValue()));
+  }
+
+  calcHasGram(item: any): number {
+    const q = item.quantity ?? 0;
+    const m = item.milyem ?? 0;
+    let has = q * m * MILYEM_FACTOR;
+    if (item.direction === 0) {
+      const pc = item.pieceCount ?? 0;
+      const ul = item.unitLabour ?? 0;
+      const labour = -(pc * ul * LABOUR_FACTOR);
+      has += labour;
+    }
+    return Math.round(has * 1e6) / 1e6;
+  }
+
+  isSaleItem(index: number): boolean {
+    return this.itemsArray.at(index)?.get('direction')?.value === 0;
+  }
+
+  parseNum(val: any): number {
+    if (val == null || val === '') return 0;
+    const str = String(val).replace(/\./g, '').replace(/,/g, '.');
+    const num = parseFloat(str);
+    return isNaN(num) ? 0 : num;
   }
 
   onSubmit(): void {
-    if (this.form.invalid || this.saving()) return;
-    const v = this.form.getRawValue();
-    
-    // Parse masked values (ngx-mask returns string with dots, convert to number)
-    const parsePrice = (val: any): number | undefined => {
-      if (val == null || val === '' || val === 0) return undefined;
-      const str = String(val).replace(/\./g, '').replace(/,/g, '.');
-      const num = parseFloat(str);
-      return isNaN(num) || num === 0 ? undefined : num;
+    if (this.itemsArray.length === 0 || this.saving()) return;
+
+    const header = this.headerForm.getRawValue();
+    const items: BasketItemCreate[] = this.itemsArray.controls.map(c => {
+      const v = c.getRawValue();
+      return {
+        direction: v.direction,
+        quantity: v.quantity,
+        milyem: v.milyem,
+        pieceCount: v.pieceCount && v.pieceCount > 0 ? v.pieceCount : undefined,
+        unitLabour: this.parseNum(v.unitLabour) || undefined,
+        price: this.parseNum(v.price) || undefined,
+        description: v.description || undefined,
+      };
+    });
+
+    const dto: BasketCreate = {
+      transactionDate: new Date(header.transactionDate).toISOString(),
+      description: header.description || undefined,
+      customerId: header.customerId || undefined,
+      items,
     };
 
-    const dto: TransactionCreate = {
-      transactionDate: new Date(v.transactionDate).toISOString(),
-      direction: v.direction,
-      quantity: v.quantity,
-      milyem: v.milyem,
-      pieceCount: v.pieceCount && v.pieceCount > 0 ? v.pieceCount : undefined,
-      unitLabour: parsePrice(v.unitLabour),
-      price: parsePrice(v.price),
-      description: v.description || undefined,
-      customerId: v.customerId || undefined,
-    };
-    
     this.saving.set(true);
-    const operation = this.editMode() && this.transactionId()
+    const op = this.editMode() && this.transactionId()
       ? this.transactionsApi.update(this.transactionId()!, dto)
       : this.transactionsApi.create(dto);
 
-    operation.subscribe({
+    op.subscribe({
       next: () => {
         this.saving.set(false);
         this.router.navigate(['/transactions']);

@@ -20,6 +20,7 @@ public class LedgerService : ILedgerService
         Guid referenceId,
         Guid? customerId,
         string? description,
+        Guid? correlationId = null,
         CancellationToken cancellationToken = default)
     {
         if (direction == TransactionDirection.Sale)
@@ -33,7 +34,8 @@ public class LedgerService : ILedgerService
                 ReferenceType = LedgerReferenceType.Transaction,
                 ReferenceId = referenceId,
                 CustomerId = customerId,
-                Description = description
+                Description = description,
+                CorrelationId = correlationId
             }, cancellationToken);
 
             if (cashAmount.HasValue && cashAmount.Value > 0)
@@ -47,7 +49,8 @@ public class LedgerService : ILedgerService
                     ReferenceType = LedgerReferenceType.Transaction,
                     ReferenceId = referenceId,
                     CustomerId = customerId,
-                    Description = description
+                    Description = description,
+                    CorrelationId = correlationId
                 }, cancellationToken);
             }
         }
@@ -62,7 +65,8 @@ public class LedgerService : ILedgerService
                 ReferenceType = LedgerReferenceType.Transaction,
                 ReferenceId = referenceId,
                 CustomerId = customerId,
-                Description = description
+                Description = description,
+                CorrelationId = correlationId
             }, cancellationToken);
 
             if (cashAmount.HasValue && cashAmount.Value > 0)
@@ -76,7 +80,8 @@ public class LedgerService : ILedgerService
                     ReferenceType = LedgerReferenceType.Transaction,
                     ReferenceId = referenceId,
                     CustomerId = customerId,
-                    Description = description
+                    Description = description,
+                    CorrelationId = correlationId
                 }, cancellationToken);
             }
         }
@@ -262,6 +267,19 @@ public class LedgerService : ILedgerService
         );
     }
 
+    public async Task<LedgerBalances> GetBalancesByPeriodAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
+    {
+        var periodGold = await _unitOfWork.Ledger.GetGoldBalanceByPeriodAsync(startDate, endDate, cancellationToken);
+        var periodCash = await _unitOfWork.Ledger.GetCashBalanceByPeriodAsync(startDate, endDate, cancellationToken);
+
+        return new LedgerBalances(
+            TotalGoldBalance: periodGold,
+            TotalCashBalance: periodCash,
+            SafeGoldBalance: periodGold,
+            SafeCashBalance: periodCash
+        );
+    }
+
     public async Task<CustomerLedgerBalances> GetCustomerBalancesAsync(Guid customerId, CancellationToken cancellationToken = default)
     {
         var goldBalance = await _unitOfWork.Ledger.GetGoldBalanceByCustomerAsync(customerId, cancellationToken);
@@ -288,6 +306,19 @@ public class LedgerService : ILedgerService
     {
         var entries = await _unitOfWork.Ledger.FindAsync(
             e => e.ReferenceType == referenceType && e.ReferenceId == referenceId,
+            cancellationToken
+        );
+
+        foreach (var entry in entries)
+        {
+            _unitOfWork.Ledger.Remove(entry);
+        }
+    }
+
+    public async Task DeleteEntriesByCorrelationAsync(Guid correlationId, CancellationToken cancellationToken = default)
+    {
+        var entries = await _unitOfWork.Ledger.FindAsync(
+            e => e.CorrelationId == correlationId,
             cancellationToken
         );
 

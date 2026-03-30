@@ -9,4 +9,6 @@ public interface ICashPeggingLogRepository
     Task<IReadOnlyList<CashPeggingLog>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CashPeggingLog>> GetByDateRangeAsync(DateTime from, DateTime to, CancellationToken cancellationToken = default);
     Task<CashPeggingLog?> GetLatestAsync(CancellationToken cancellationToken = default);
+    void Update(CashPeggingLog entity);
+    void Delete(CashPeggingLog entity);
 }

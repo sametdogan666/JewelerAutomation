@@ -4,9 +4,8 @@ import { ApiService } from './api.service';
 
 export type TransactionDirection = 0 | 1; // 0 Sale, 1 Purchase
 
-export interface Transaction {
+export interface TransactionItem {
   id: string;
-  transactionDate: string;
   direction: TransactionDirection;
   quantity: number;
   milyem: number;
@@ -17,13 +16,25 @@ export interface Transaction {
   price?: number;
   description?: string;
   milyemLabour: number;
-  customerId?: string;
-  customer?: { id: string; name: string };
-  createdAt: string;
 }
 
-export interface TransactionCreate {
+export interface Transaction {
+  id: string;
   transactionDate: string;
+  direction: TransactionDirection;
+  netHasGram: number;
+  netCashAmount: number;
+  hasGram: number;
+  price?: number;
+  description?: string;
+  customerId?: string;
+  customerName?: string;
+  correlationId?: string;
+  createdAt: string;
+  items: TransactionItem[];
+}
+
+export interface BasketItemCreate {
   direction: TransactionDirection;
   quantity: number;
   milyem: number;
@@ -31,7 +42,13 @@ export interface TransactionCreate {
   unitLabour?: number;
   price?: number;
   description?: string;
+}
+
+export interface BasketCreate {
+  transactionDate: string;
+  description?: string;
   customerId?: string;
+  items: BasketItemCreate[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -49,11 +66,11 @@ export class TransactionsService {
     return this.api.get<Transaction>(`transactions/${id}`);
   }
 
-  create(dto: TransactionCreate): Observable<Transaction> {
+  create(dto: BasketCreate): Observable<Transaction> {
     return this.api.post<Transaction>('transactions', dto);
   }
 
-  update(id: string, dto: TransactionCreate): Observable<Transaction> {
+  update(id: string, dto: BasketCreate): Observable<Transaction> {
     return this.api.put<Transaction>(`transactions/${id}`, dto);
   }
 

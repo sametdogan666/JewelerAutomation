@@ -10,14 +10,16 @@ namespace JewelerAutomation.Application.Services;
 public class AccountingService : IAccountingService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ILedgerService _ledger;
     
-    private const decimal MilyemFactor = 0.001m;   // / 1000
-    private const decimal LabourFactor = 0.01m;     // %1 birim işçilik çarpanı
-    private const decimal MilyemThreshold = 916m;   // 916 üstü fazlalık hesabı
+    private const decimal MilyemFactor = 0.001m;
+    private const decimal LabourFactor = 0.01m;
+    private const decimal MilyemThreshold = 916m;
     
-    public AccountingService(IUnitOfWork unitOfWork)
+    public AccountingService(IUnitOfWork unitOfWork, ILedgerService ledger)
     {
         _unitOfWork = unitOfWork;
+        _ledger = ledger;
     }
 
     /// <inheritdoc />
@@ -61,33 +63,23 @@ public class AccountingService : IAccountingService
         DateTime? endDate = null, 
         CancellationToken cancellationToken = default)
     {
-        // 1. Başlangıç sermayesini al (ilk Ana Sermaye hareketi)
         var initialCapital = await GetInitialCapitalAsync(cancellationToken);
         
-        // 2. Kasadaki toplam altın (Has Gram)
-        var goldInSafe = await _unitOfWork.SafeMovements
-            .GetTotalHasGramBalanceAsync(cancellationToken);
+        var balances = await _ledger.GetBalancesAsync(cancellationToken);
+        var goldInSafe = balances.TotalGoldBalance;
+        var netCash = balances.TotalCashBalance;
         
-        // 3. Nakit bakiyesini al (Transaction'lardan)
-        var cashBalance = await GetCashBalanceAsync(cancellationToken);
-        var netCash = cashBalance.NetCashBalance;
+        var cashEquivalentGold = goldPricePerGram > 0 ? netCash / goldPricePerGram : 0;
         
-        // 4. Nakit Bağlama: Nakit / Has Fiyatı
-        var cashEquivalentGold = netCash / goldPricePerGram;
-        
-        // 5. Net Sermaye = Nakit Karşılığı + Altın
         var netCapital = cashEquivalentGold + goldInSafe;
-        
-        // 6. Net Kar/Zarar = Net Sermaye - Başlangıç Sermayesi
-        var netProfit = netCapital - initialCapital;
         
         return new AccountingProfitResult(
             InitialCapitalHasGram: initialCapital,
-            CurrentGoldInSafeHasGram: goldInSafe,
-            CurrentCashBalanceTL: netCash,
+            CurrentGoldInSafeHasGram: Math.Round(goldInSafe, 6),
+            CurrentCashBalanceTL: Math.Round(netCash, 6),
             CashEquivalentHasGram: Math.Round(cashEquivalentGold, 6),
             NetCapitalHasGram: Math.Round(netCapital, 6),
-            NetProfitHasGram: Math.Round(netProfit, 6),
+            NetProfitHasGram: Math.Round(netCapital, 6),
             GoldPriceUsed: goldPricePerGram
         );
     }
@@ -95,7 +87,6 @@ public class AccountingService : IAccountingService
     /// <inheritdoc />
     public async Task<decimal> GetInitialCapitalAsync(CancellationToken cancellationToken = default)
     {
-        // İlk "Ana Sermaye" (Capital) kasa hareketini bul
         var allMovements = await _unitOfWork.SafeMovements.GetAllAsync(cancellationToken);
         var capitalMovement = allMovements
             .Where(m => m.MovementType == SafeMovementType.Capital)
@@ -109,22 +100,43 @@ public class AccountingService : IAccountingService
     /// <inheritdoc />
     public async Task<CashBalanceResult> GetCashBalanceAsync(CancellationToken cancellationToken = default)
     {
+        var balances = await _ledger.GetBalancesAsync(cancellationToken);
         var transactions = await _unitOfWork.Transactions.GetAllAsync(cancellationToken);
-        
-        var totalSales = transactions
-            .Where(t => t.Direction == TransactionDirection.Sale && t.Price.HasValue)
-            .Sum(t => t.Price!.Value);
-        
-        var totalPurchases = transactions
-            .Where(t => t.Direction == TransactionDirection.Purchase && t.Price.HasValue)
-            .Sum(t => t.Price!.Value);
-        
-        var netCash = totalSales - totalPurchases;
-        
+
+        decimal totalSales = 0;
+        decimal totalPurchases = 0;
+
+        foreach (var tx in transactions)
+        {
+            if (tx.Items.Any())
+            {
+                foreach (var item in tx.Items)
+                {
+                    if (item.Price.HasValue)
+                    {
+                        if (item.Direction == TransactionDirection.Sale)
+                            totalSales += item.Price.Value;
+                        else
+                            totalPurchases += item.Price.Value;
+                    }
+                }
+            }
+            else
+            {
+                if (tx.Price.HasValue)
+                {
+                    if (tx.Direction == TransactionDirection.Sale)
+                        totalSales += tx.Price.Value;
+                    else
+                        totalPurchases += tx.Price.Value;
+                }
+            }
+        }
+
         return new CashBalanceResult(
             TotalSalesCash: totalSales,
             TotalPurchasesCash: totalPurchases,
-            NetCashBalance: netCash
+            NetCashBalance: balances.TotalCashBalance
         );
     }
 
@@ -143,33 +155,69 @@ public class AccountingService : IAccountingService
 
         foreach (var tx in transactions)
         {
-            var cashImpact = tx.Price ?? 0;
-            var direction = tx.Direction == TransactionDirection.Sale ? "Satış" : "Alış";
-
-            if (tx.Direction == TransactionDirection.Sale)
+            if (tx.Items.Any())
             {
-                totalSalesHas += tx.HasGram;
-                totalSalesCash += cashImpact;
-            }
-            else if (tx.Direction == TransactionDirection.Purchase)
-            {
-                totalPurchasesHas += tx.HasGram;
-                totalPurchasesCash += cashImpact;
-                cashImpact = -cashImpact; // Alışta nakit azalır
-            }
+                foreach (var item in tx.Items)
+                {
+                    var cashImpact = item.Price ?? 0;
+                    var direction = item.Direction == TransactionDirection.Sale ? "Satış" : "Alış";
 
-            details.Add(new TransactionDetail(
-                Id: tx.Id,
-                Date: tx.TransactionDate,
-                Direction: direction,
-                Quantity: tx.Quantity,
-                Milyem: tx.Milyem,
-                HasGram: tx.HasGram,
-                Price: tx.Price ?? 0,
-                CashImpact: cashImpact,
-                CustomerName: tx.Customer?.Name,
-                Description: tx.Description
-            ));
+                    if (item.Direction == TransactionDirection.Sale)
+                    {
+                        totalSalesHas += item.HasGram;
+                        totalSalesCash += cashImpact;
+                    }
+                    else
+                    {
+                        totalPurchasesHas += item.HasGram;
+                        totalPurchasesCash += cashImpact;
+                        cashImpact = -cashImpact;
+                    }
+
+                    details.Add(new TransactionDetail(
+                        Id: tx.Id,
+                        Date: tx.TransactionDate,
+                        Direction: direction,
+                        Quantity: item.Quantity,
+                        Milyem: item.Milyem,
+                        HasGram: item.HasGram,
+                        Price: item.Price ?? 0,
+                        CashImpact: cashImpact,
+                        CustomerName: tx.Customer?.Name,
+                        Description: item.Description ?? tx.Description
+                    ));
+                }
+            }
+            else
+            {
+                var cashImpact = tx.Price ?? 0;
+                var direction = tx.Direction == TransactionDirection.Sale ? "Satış" : "Alış";
+
+                if (tx.Direction == TransactionDirection.Sale)
+                {
+                    totalSalesHas += tx.HasGram;
+                    totalSalesCash += cashImpact;
+                }
+                else if (tx.Direction == TransactionDirection.Purchase)
+                {
+                    totalPurchasesHas += tx.HasGram;
+                    totalPurchasesCash += cashImpact;
+                    cashImpact = -cashImpact;
+                }
+
+                details.Add(new TransactionDetail(
+                    Id: tx.Id,
+                    Date: tx.TransactionDate,
+                    Direction: direction,
+                    Quantity: tx.Quantity,
+                    Milyem: tx.Milyem,
+                    HasGram: tx.HasGram,
+                    Price: tx.Price ?? 0,
+                    CashImpact: cashImpact,
+                    CustomerName: tx.Customer?.Name,
+                    Description: tx.Description
+                ));
+            }
         }
 
         var netCashChange = totalSalesCash - totalPurchasesCash;

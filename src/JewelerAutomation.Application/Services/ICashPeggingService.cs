@@ -2,14 +2,8 @@ using JewelerAutomation.Core.Entities;
 
 namespace JewelerAutomation.Application.Services;
 
-/// <summary>
-/// Nakit Bağlama (Cash-to-Gold Pegging) işlemlerini yönetir.
-/// </summary>
 public interface ICashPeggingService
 {
-    /// <summary>
-    /// Nakit bağlama işlemi yapar ve kaydeder.
-    /// </summary>
     Task<CashPeggingLog> CreatePeggingAsync(
         DateTime periodStart,
         DateTime periodEnd,
@@ -18,28 +12,23 @@ public interface ICashPeggingService
         Guid? userId = null,
         CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Tüm nakit bağlama geçmişini getirir.
-    /// </summary>
+    Task DeletePeggingAsync(Guid peggingId, CancellationToken cancellationToken = default);
+
+    Task<CashPeggingLog> UpdatePeggingAsync(
+        Guid peggingId,
+        decimal newGoldPricePerGram,
+        string? notes = null,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<CashPeggingLog>> GetPeggingHistoryAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Belirli tarih aralığındaki nakit bağlama kayıtlarını getirir.
-    /// </summary>
     Task<IReadOnlyList<CashPeggingLog>> GetPeggingHistoryByDateRangeAsync(
         DateTime from,
         DateTime to,
         CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// En son nakit bağlama kaydını getirir.
-    /// </summary>
     Task<CashPeggingLog?> GetLatestPeggingAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Simülasyon: Verilen parametrelerle nakit bağlama yapılsaydı ne olurdu?
-    /// Kayıt oluşturmaz, sadece hesaplama yapar.
-    /// </summary>
     Task<PeggingSimulationResult> SimulatePeggingAsync(
         DateTime periodStart,
         DateTime periodEnd,
@@ -48,15 +37,19 @@ public interface ICashPeggingService
 }
 
 /// <summary>
-/// Nakit bağlama simülasyon sonucu.
+/// Period-based profit model (excludes physical gold inventory):
+///   transactionProfit  = totalSalesHasGram - totalPurchasesHasGram
+///   cashPeggingProfit  = periodCashBalance / goldPrice
+///   netProfitHasGram   = cashPeggingProfit - transactionProfit
+///   netProfitTL        = netProfitHasGram * goldPrice
 /// </summary>
 public record PeggingSimulationResult(
-    decimal CashBalance,
-    decimal GoldBalance,
+    decimal PeriodCashBalance,
+    decimal GoldBalanceInSafe,
     decimal CashEquivalentHasGram,
-    decimal TotalCapitalHasGram,
-    decimal InitialCapitalHasGram,
+    decimal TotalSalesHasGram,
+    decimal TotalPurchasesHasGram,
     decimal TransactionProfitHasGram,
-    decimal ExchangeRateProfitHasGram,
-    decimal NetProfitHasGram
+    decimal NetProfitHasGram,
+    decimal NetProfitTL
 );

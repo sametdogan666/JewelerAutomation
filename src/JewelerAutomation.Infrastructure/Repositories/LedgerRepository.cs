@@ -37,6 +37,32 @@ public class LedgerRepository : Repository<LedgerEntry>, ILedgerRepository
         return cashIn - cashOut;
     }
 
+    public async Task<decimal> GetGoldBalanceByPeriodAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
+    {
+        var goldIn = await Context.LedgerEntries
+            .Where(e => e.EntryType == LedgerEntryType.GoldIn && e.TransactionDate >= startDate && e.TransactionDate <= endDate)
+            .SumAsync(e => e.GoldHasAmount, cancellationToken);
+
+        var goldOut = await Context.LedgerEntries
+            .Where(e => e.EntryType == LedgerEntryType.GoldOut && e.TransactionDate >= startDate && e.TransactionDate <= endDate)
+            .SumAsync(e => e.GoldHasAmount, cancellationToken);
+
+        return goldIn - goldOut;
+    }
+
+    public async Task<decimal> GetCashBalanceByPeriodAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
+    {
+        var cashIn = await Context.LedgerEntries
+            .Where(e => e.EntryType == LedgerEntryType.CashIn && e.TransactionDate >= startDate && e.TransactionDate <= endDate)
+            .SumAsync(e => e.CashAmount, cancellationToken);
+
+        var cashOut = await Context.LedgerEntries
+            .Where(e => e.EntryType == LedgerEntryType.CashOut && e.TransactionDate >= startDate && e.TransactionDate <= endDate)
+            .SumAsync(e => e.CashAmount, cancellationToken);
+
+        return cashIn - cashOut;
+    }
+
     public async Task<decimal> GetGoldBalanceByCustomerAsync(Guid customerId, CancellationToken cancellationToken = default)
     {
         var goldIn = await Context.LedgerEntries
@@ -77,5 +103,10 @@ public class LedgerRepository : Repository<LedgerEntry>, ILedgerRepository
             .Where(e => e.CustomerId == customerId && e.TransactionDate >= startDate && e.TransactionDate <= endDate)
             .OrderBy(e => e.TransactionDate)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<int> CountAsync(CancellationToken cancellationToken = default)
+    {
+        return await Context.LedgerEntries.CountAsync(cancellationToken);
     }
 }

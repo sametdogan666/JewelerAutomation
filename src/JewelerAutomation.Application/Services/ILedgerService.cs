@@ -25,6 +25,7 @@ public interface ILedgerService
         Guid referenceId,
         Guid? customerId,
         string? description,
+        Guid? correlationId = null,
         CancellationToken cancellationToken = default);
 
     Task RecordCustomerTransactionAsync(
@@ -63,8 +64,10 @@ public interface ILedgerService
         CancellationToken cancellationToken = default);
 
     Task<LedgerBalances> GetBalancesAsync(CancellationToken cancellationToken = default);
+    Task<LedgerBalances> GetBalancesByPeriodAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
     Task<CustomerLedgerBalances> GetCustomerBalancesAsync(Guid customerId, CancellationToken cancellationToken = default);
     Task<decimal> GetSafeGoldBalanceAsync(CancellationToken cancellationToken = default);
     Task<decimal> GetSafeCashBalanceAsync(CancellationToken cancellationToken = default);
     Task DeleteEntriesByReferenceAsync(LedgerReferenceType referenceType, Guid referenceId, CancellationToken cancellationToken = default);
+    Task DeleteEntriesByCorrelationAsync(Guid correlationId, CancellationToken cancellationToken = default);
 }

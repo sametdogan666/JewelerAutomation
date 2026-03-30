@@ -13,4 +13,8 @@ public interface IUnitOfWork : IDisposable
     ILedgerRepository Ledger { get; }
     ICashToGoldConversionRepository CashToGoldConversions { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+    Task BeginTransactionAsync(CancellationToken cancellationToken = default);
+    Task CommitTransactionAsync(CancellationToken cancellationToken = default);
+    Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
+    Task ExecuteRawSqlAsync(string sql, CancellationToken cancellationToken = default);
 }

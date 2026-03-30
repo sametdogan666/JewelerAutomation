@@ -170,31 +170,42 @@ import { debounceTime, distinctUntilChanged } from 'rxjs';
           <div class="right-column">
             <div class="summary-panel">
               @if (simulationResult(); as result) {
-                <!-- Period Profit Card (Main) -->
-                @if (periodSummary(); as summary) {
-                  <div class="profit-card" [class.profit-card--gain]="(result.cashEquivalentHasGram - summary.totalSalesHasGram) >= 0" [class.profit-card--loss]="(result.cashEquivalentHasGram - summary.totalSalesHasGram) < 0">
-                    <div class="profit-header">
-                      <mat-icon class="profit-icon">{{ (result.cashEquivalentHasGram - summary.totalSalesHasGram) >= 0 ? 'trending_up' : 'trending_down' }}</mat-icon>
-                      <span class="profit-label">Dönem Net Kâr/Zarar</span>
-                    </div>
-                    <div class="profit-amount">
-                      {{ (result.cashEquivalentHasGram - summary.totalSalesHasGram) >= 0 ? '+' : '' }}{{ (result.cashEquivalentHasGram - summary.totalSalesHasGram) | number:'1.2-2' }}
-                    </div>
-                    <div class="profit-unit">Has Gr</div>
+                <!-- Period Net Profit Card (Main) -->
+                <div class="profit-card" [class.profit-card--gain]="result.netProfitHasGram >= 0" [class.profit-card--loss]="result.netProfitHasGram < 0">
+                  <div class="profit-header">
+                    <mat-icon class="profit-icon">{{ result.netProfitHasGram >= 0 ? 'trending_up' : 'trending_down' }}</mat-icon>
+                    <span class="profit-label">Dönem Net Kâr/Zarar</span>
                   </div>
+                  <div class="profit-amount">
+                    {{ result.netProfitHasGram >= 0 ? '+' : '' }}{{ result.netProfitHasGram | number:'1.2-2' }}
+                  </div>
+                  <div class="profit-unit">Has Gr</div>
+                  <div class="profit-tl">
+                    {{ result.netProfitTL >= 0 ? '+' : '' }}{{ result.netProfitTL | number:'1.2-2' }} ₺
+                  </div>
+                </div>
 
-                  <!-- Period Details -->
-                  <div class="card details-card">
-                    <div class="detail-row">
-                      <span class="detail-label">Dönem Satış</span>
-                      <span class="detail-value detail-value--sale">{{ summary.totalSalesHasGram | number:'1.2-2' }} Has Gr</span>
-                    </div>
-                    <div class="detail-row">
-                      <span class="detail-label">Nakit Karşılığı</span>
-                      <span class="detail-value detail-value--cash">{{ result.cashEquivalentHasGram | number:'1.2-2' }} Has Gr</span>
-                    </div>
+                <!-- Profit Breakdown -->
+                <div class="card details-card">
+                  <div class="detail-row">
+                    <span class="detail-label">Dönem Satış</span>
+                    <span class="detail-value detail-value--sale">{{ result.totalSalesHasGram | number:'1.2-2' }} Has Gr</span>
                   </div>
-                }
+                  <div class="detail-row">
+                    <span class="detail-label">Dönem Alış</span>
+                    <span class="detail-value detail-value--purchase">{{ result.totalPurchasesHasGram | number:'1.2-2' }} Has Gr</span>
+                  </div>
+                  <div class="detail-row detail-row--highlight">
+                    <span class="detail-label">İşlem Kârı (Satış - Alış)</span>
+                    <span class="detail-value" [class.positive]="result.transactionProfitHasGram >= 0" [class.negative]="result.transactionProfitHasGram < 0">
+                      {{ result.transactionProfitHasGram >= 0 ? '+' : '' }}{{ result.transactionProfitHasGram | number:'1.2-2' }} Has Gr
+                    </span>
+                  </div>
+                  <div class="detail-row detail-row--highlight">
+                    <span class="detail-label">Nakit Bağlama Kârı</span>
+                    <span class="detail-value detail-value--cash">{{ result.cashEquivalentHasGram >= 0 ? '+' : '' }}{{ result.cashEquivalentHasGram | number:'1.2-2' }} Has Gr</span>
+                  </div>
+                </div>
 
                 <!-- Financial Details -->
                 <div class="card">
@@ -208,8 +219,8 @@ import { debounceTime, distinctUntilChanged } from 'rxjs';
                         <mat-icon>account_balance_wallet</mat-icon>
                       </div>
                       <div class="info-content">
-                        <div class="info-label">Biriken Nakit</div>
-                        <div class="info-value">{{ result.cashBalance | number:'1.2-2' }} ₺</div>
+                        <div class="info-label">Dönem Nakit Bakiye</div>
+                        <div class="info-value">{{ result.periodCashBalance | number:'1.2-2' }} ₺</div>
                       </div>
                     </div>
 
@@ -220,7 +231,7 @@ import { debounceTime, distinctUntilChanged } from 'rxjs';
                       <div class="info-content">
                         <div class="info-label">Nakit Karşılığı Has</div>
                         <div class="info-value">{{ result.cashEquivalentHasGram | number:'1.2-2' }} Gr</div>
-                        <div class="info-hint">{{ result.cashBalance | number:'1.0-0' }} ÷ {{ simulationPrice() | number:'1.0-0' }}</div>
+                        <div class="info-hint">{{ result.periodCashBalance | number:'1.0-0' }} ÷ {{ simulationPrice() | number:'1.0-0' }}</div>
                       </div>
                     </div>
 
@@ -230,7 +241,8 @@ import { debounceTime, distinctUntilChanged } from 'rxjs';
                       </div>
                       <div class="info-content">
                         <div class="info-label">Kasadaki Fiziksel Altın</div>
-                        <div class="info-value">{{ result.goldBalance | number:'1.2-2' }} Has Gr</div>
+                        <div class="info-value">{{ result.goldBalanceInSafe | number:'1.2-2' }} Has Gr</div>
+                        <div class="info-hint">Kâr hesabına dahil değil</div>
                       </div>
                     </div>
                   </div>
@@ -742,6 +754,13 @@ import { debounceTime, distinctUntilChanged } from 'rxjs';
       opacity: 0.9;
     }
 
+    .profit-tl {
+      margin-top: 0.375rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      opacity: 0.85;
+    }
+
     /* ========== DETAILS CARD ========== */
     .details-card {
       background: #f9fafb;
@@ -775,9 +794,26 @@ import { debounceTime, distinctUntilChanged } from 'rxjs';
         color: #10b981;
       }
 
+      &--purchase {
+        color: #f59e0b;
+      }
+
       &--cash {
         color: #3b82f6;
       }
+
+      &.positive {
+        color: #10b981;
+      }
+
+      &.negative {
+        color: #ef4444;
+      }
+    }
+
+    .detail-row--highlight {
+      background: #f9fafb;
+      font-weight: 600;
     }
 
     /* ========== INFO ROWS ========== */
