@@ -140,3 +140,47 @@ body {
 }
 .badge-sale { background: #fff3e0; color: #e65100; }
 .badge-purchase { background: #e8f5e9; color: #2e7d32; }
+
+/* ── SweetAlert2 premium theme ── */
+.swal-premium-popup {
+  border: 1px solid rgba(123, 44, 191, 0.3) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5) !important;
+}
+.swal-premium-title {
+  font-size: 1.25rem !important;
+  font-weight: 600 !important;
+}
+.swal-premium-confirm {
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  padding: 0.5rem 1.5rem !important;
+}
+.swal-premium-cancel {
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  padding: 0.5rem 1.5rem !important;
+}
+
+/* ── Snackbar overrides ── */
+.snackbar-success .mdc-snackbar__surface {
+  background: #1b5e20 !important;
+}
+.snackbar-success .mdc-snackbar__label {
+  color: #e8f5e9 !important;
+  font-weight: 500;
+}
+.snackbar-success .mdc-snackbar__action:not(:disabled) {
+  color: #a5d6a7 !important;
+}
+
+.snackbar-error .mdc-snackbar__surface {
+  background: #b71c1c !important;
+}
+.snackbar-error .mdc-snackbar__label {
+  color: #ffcdd2 !important;
+  font-weight: 500;
+}
+.snackbar-error .mdc-snackbar__action:not(:disabled) {
+  color: #ef9a9a !important;
+}

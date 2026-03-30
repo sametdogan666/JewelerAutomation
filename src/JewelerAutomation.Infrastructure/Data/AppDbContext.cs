@@ -33,8 +33,17 @@ public class AppDbContext : DbContext
             entry.Entity.IsDeleted = true;
             entry.Entity.DeletedAt = DateTime.UtcNow;
 
-            if (entry.Entity is CashPeggingLog pegging && pegging.CorrelationId != Guid.Empty)
-                correlationIdsToDelete.Add(pegging.CorrelationId);
+            Guid? corrId = entry.Entity switch
+            {
+                CashPeggingLog p when p.CorrelationId != Guid.Empty => p.CorrelationId,
+                Transaction t => t.CorrelationId,
+                SafeMovement m => m.CorrelationId,
+                LedgerEntry le => le.CorrelationId,
+                _ => null
+            };
+
+            if (corrId.HasValue && corrId.Value != Guid.Empty)
+                correlationIdsToDelete.Add(corrId.Value);
         }
 
         if (correlationIdsToDelete.Count > 0)
@@ -47,6 +56,18 @@ public class AppDbContext : DbContext
         IReadOnlySet<Guid> correlationIds, CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
+
+        var linkedPeggingLogs = await CashPeggingLogs
+            .IgnoreQueryFilters()
+            .Where(p => correlationIds.Contains(p.CorrelationId)
+                        && !p.IsDeleted)
+            .ToListAsync(cancellationToken);
+
+        foreach (var p in linkedPeggingLogs)
+        {
+            p.IsDeleted = true;
+            p.DeletedAt = now;
+        }
 
         var linkedTransactions = await Transactions
             .IgnoreQueryFilters()

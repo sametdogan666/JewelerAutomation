@@ -1,8 +1,10 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { DecimalPipe, NgClass } from '@angular/common';
+import { Subscription } from 'rxjs';
 import { SafeService, SafeStatus } from '../../core/services/safe.service';
+import { DashboardRefreshService } from '../../core/services/dashboard-refresh.service';
 
 @Component({
   selector: 'app-safe-status-widget',
@@ -134,6 +136,36 @@ import { SafeService, SafeStatus } from '../../core/services/safe.service';
                 <span class="profit-hint">(performans göstergesi)</span>
               </div>
             </div>
+
+            <!-- ─── SECTION 3: Net Performance (Mali Analiz) ─── -->
+            @if (status()!.peggingCount > 0) {
+              <div class="section performance-section">
+                <h3 class="section-title">
+                  <mat-icon>insights</mat-icon>
+                  Mali Performans
+                  <span class="section-hint">Tüm bağlama işlemlerinden</span>
+                </h3>
+
+                <div class="performance-card" [ngClass]="perfClass()">
+                  <div class="perf-main">
+                    <div class="perf-icon-wrap">
+                      <mat-icon>{{ status()!.cumulativePeggingProfitHasGram >= 0 ? 'emoji_events' : 'warning' }}</mat-icon>
+                    </div>
+                    <div class="perf-body">
+                      <span class="perf-label">Toplam Gerçekleşen Kâr</span>
+                      <span class="perf-value">
+                        {{ status()!.cumulativePeggingProfitHasGram >= 0 ? '+' : '' }}{{ status()!.cumulativePeggingProfitHasGram | number:'1.4-4' }}
+                        <small>Has Gr</small>
+                      </span>
+                    </div>
+                  </div>
+                  <div class="perf-meta">
+                    <mat-icon>receipt_long</mat-icon>
+                    <span>{{ status()!.peggingCount }} bağlama işlemi</span>
+                  </div>
+                </div>
+              </div>
+            }
 
           </div>
         } @else {
@@ -267,6 +299,53 @@ import { SafeService, SafeStatus } from '../../core/services/safe.service';
     .profit-value { margin-left: auto; font-weight: 700; }
     .profit-hint  { font-size: .7rem; color: rgba(255,255,255,.5); margin-left: .25rem; }
 
+    /* ── Performance section (Mali Analiz) ── */
+    .performance-section {
+      border-top: 1px solid rgba(255,255,255,.15);
+      padding-top: 1rem;
+    }
+
+    .performance-card {
+      border-radius: 10px;
+      padding: 1rem;
+      border: 1px solid rgba(255,255,255,.2);
+    }
+    .performance-card.performance--gain {
+      background: linear-gradient(135deg, rgba(76,175,80,.25) 0%, rgba(56,142,60,.15) 100%);
+      border-color: rgba(76,175,80,.4);
+    }
+    .performance-card.performance--loss {
+      background: linear-gradient(135deg, rgba(244,67,54,.25) 0%, rgba(211,47,47,.15) 100%);
+      border-color: rgba(244,67,54,.4);
+    }
+
+    .perf-main {
+      display: flex; align-items: center; gap: .75rem;
+    }
+    .perf-icon-wrap {
+      width: 44px; height: 44px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      background: rgba(255,255,255,.15);
+      mat-icon { font-size: 1.5rem; width: 1.5rem; height: 1.5rem; color: white; }
+    }
+    .perf-body { flex: 1; display: flex; flex-direction: column; gap: .2rem; }
+    .perf-label {
+      font-size: .7rem; color: rgba(255,255,255,.7);
+      text-transform: uppercase; letter-spacing: .6px; font-weight: 500;
+    }
+    .perf-value {
+      font-size: 1.5rem; font-weight: 700; color: white;
+      small { font-size: .8rem; font-weight: 500; color: rgba(255,255,255,.7); }
+    }
+
+    .perf-meta {
+      display: flex; align-items: center; gap: .35rem;
+      margin-top: .6rem; padding-top: .6rem;
+      border-top: 1px solid rgba(255,255,255,.1);
+      font-size: .75rem; color: rgba(255,255,255,.6);
+      mat-icon { font-size: 1rem; width: 1rem; height: 1rem; }
+    }
+
     .loading-state, .error-state {
       text-align: center; padding: 2rem; color: rgba(255,255,255,.8);
     }
@@ -278,14 +357,21 @@ import { SafeService, SafeStatus } from '../../core/services/safe.service';
     }
   `]
 })
-export class SafeStatusWidgetComponent implements OnInit {
+export class SafeStatusWidgetComponent implements OnInit, OnDestroy {
   private safeService = inject(SafeService);
+  private refreshService = inject(DashboardRefreshService);
+  private refreshSub?: Subscription;
 
   status = signal<SafeStatus | null>(null);
   loading = signal(true);
 
   ngOnInit(): void {
     this.loadStatus();
+    this.refreshSub = this.refreshService.refresh$.subscribe(() => this.loadStatus());
+  }
+
+  ngOnDestroy(): void {
+    this.refreshSub?.unsubscribe();
   }
 
   loadStatus(): void {
@@ -313,5 +399,10 @@ export class SafeStatusWidgetComponent implements OnInit {
   profitClass(): string {
     const p = this.status()?.profitHasGram ?? 0;
     return p >= 0 ? 'profit--gain' : 'profit--loss';
+  }
+
+  perfClass(): string {
+    const v = this.status()?.cumulativePeggingProfitHasGram ?? 0;
+    return v >= 0 ? 'performance--gain' : 'performance--loss';
   }
 }

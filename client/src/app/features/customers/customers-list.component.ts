@@ -6,6 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipsModule } from '@angular/material/chips';
 import { CustomersService, Customer } from '../../core/services/customers.service';
+import { NotificationService } from '../../core/services/notification.service';
 import { NgIf } from '@angular/common';
 
 @Component({
@@ -17,6 +18,7 @@ import { NgIf } from '@angular/common';
 })
 export class CustomersListComponent implements OnInit {
   private api = inject(CustomersService);
+  private notify = inject(NotificationService);
 
   dataSource = new MatTableDataSource<Customer>([]);
   loading = signal(true);
@@ -33,12 +35,17 @@ export class CustomersListComponent implements OnInit {
     });
   }
 
-  delete(item: Customer, event: Event): void {
+  async delete(item: Customer, event: Event): Promise<void> {
     event.stopPropagation();
-    if (!confirm(`"${item.name}" kaydını silmek istediğinize emin misiniz?`)) return;
+    const confirmed = await this.notify.confirmDelete(`"${item.name}" müşteri kaydını silmek istediğinize emin misiniz?`);
+    if (!confirmed) return;
     this.api.delete(item.id).subscribe({
       next: () => {
         this.dataSource.data = this.dataSource.data.filter((x) => x.id !== item.id);
+        this.notify.success('Müşteri silindi');
+      },
+      error: (err) => {
+        this.notify.error('Silme Hatası', err?.error?.message || 'Müşteri silinirken bir hata oluştu.');
       },
     });
   }

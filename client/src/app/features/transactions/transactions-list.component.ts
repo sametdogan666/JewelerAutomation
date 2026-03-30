@@ -13,6 +13,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { TransactionsService, Transaction, TransactionDirection } from '../../core/services/transactions.service';
+import { NotificationService } from '../../core/services/notification.service';
+import { DashboardRefreshService } from '../../core/services/dashboard-refresh.service';
 
 @Component({
   selector: 'app-transactions-list',
@@ -39,6 +41,8 @@ import { TransactionsService, Transaction, TransactionDirection } from '../../co
 export class TransactionsListComponent implements OnInit {
   private api = inject(TransactionsService);
   private cdr = inject(ChangeDetectorRef);
+  private notify = inject(NotificationService);
+  private refreshService = inject(DashboardRefreshService);
 
   dataSource = new MatTableDataSource<Transaction>([]);
   loading = signal(true);
@@ -124,19 +128,25 @@ export class TransactionsListComponent implements OnInit {
     this.expandedRow.set(this.expandedRow() === tx.id ? null : tx.id);
   }
 
-  onDelete(tx: Transaction): void {
-    if (!confirm(`"${tx.description || 'Bu sepet'}" kaydını silmek istediğinizden emin misiniz? Tüm kalemler ve kasa hareketleri de silinecektir.`)) {
-      return;
-    }
+  async onDelete(tx: Transaction): Promise<void> {
+    const desc = tx.description || 'Bu sepet';
+    const confirmed = await this.notify.confirmDelete(
+      `"${desc}" kaydını silmek istediğinizden emin misiniz? Tüm kalemler ve kasa hareketleri de silinecektir.`
+    );
+    if (!confirmed) return;
+
     this.deleting.set(tx.id);
     this.api.delete(tx.id).subscribe({
       next: () => {
         this.deleting.set(null);
         this.dataSource.data = this.dataSource.data.filter(t => t.id !== tx.id);
+        this.notify.success('İşlem silindi');
+        this.refreshService.triggerRefresh();
         this.cdr.detectChanges();
       },
-      error: () => {
+      error: (err) => {
         this.deleting.set(null);
+        this.notify.error('Silme Hatası', err?.error?.message || 'İşlem silinirken bir hata oluştu.');
         this.cdr.detectChanges();
       },
     });

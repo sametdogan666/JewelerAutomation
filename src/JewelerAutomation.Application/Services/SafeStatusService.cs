@@ -36,6 +36,7 @@ public class SafeStatusService : ISafeStatusService
                 SafeMovementType.Income => sm.HasGram,
                 SafeMovementType.Expense => -Math.Abs(sm.HasGram),
                 SafeMovementType.Transfer => sm.HasGram,
+                SafeMovementType.ProfitRealization => 0m,
                 _ => 0m
             };
         }
@@ -104,6 +105,13 @@ public class SafeStatusService : ISafeStatusService
         var initialCapital = initialCapitalMovement?.HasGram ?? 0m;
         var profitHasGram = netGold - initialCapital;
 
+        // ── Cumulative Performance (from all ProfitRealization entries) ──
+        var profitRealizations = allMovements
+            .Where(m => m.MovementType == SafeMovementType.ProfitRealization)
+            .ToList();
+        var cumulativePeggingProfit = profitRealizations.Sum(m => m.HasGram);
+        var peggingCount = profitRealizations.Count;
+
         return new SafeStatus(
             PhysicalGoldBalance: physicalGold,
             PhysicalCashBalance: physicalCash,
@@ -115,7 +123,9 @@ public class SafeStatusService : ISafeStatusService
             PersonalGoldReceivable: personalReceivable,
             NetGoldPosition: netGold,
             NetCashPosition: netCash,
-            ProfitHasGram: profitHasGram
+            ProfitHasGram: profitHasGram,
+            CumulativePeggingProfitHasGram: cumulativePeggingProfit,
+            PeggingCount: peggingCount
         );
     }
 }

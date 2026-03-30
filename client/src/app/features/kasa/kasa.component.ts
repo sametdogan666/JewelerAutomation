@@ -11,6 +11,8 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { SafeService, SafeMovement, SafeMovementCreate, SafeStatus } from '../../core/services/safe.service';
+import { NotificationService } from '../../core/services/notification.service';
+import { DashboardRefreshService } from '../../core/services/dashboard-refresh.service';
 import { NgIf, DecimalPipe } from '@angular/common';
 
 const MOVEMENT_TYPES: { value: 0 | 1 | 2 | 3; label: string }[] = [
@@ -43,6 +45,8 @@ const MOVEMENT_TYPES: { value: 0 | 1 | 2 | 3; label: string }[] = [
 export class KasaComponent implements OnInit {
   private api = inject(SafeService);
   private fb = inject(FormBuilder);
+  private notify = inject(NotificationService);
+  private refreshService = inject(DashboardRefreshService);
 
   safeStatus = signal<SafeStatus | null>(null);
   dataSource = new MatTableDataSource<SafeMovement>([]);
@@ -116,12 +120,14 @@ export class KasaComponent implements OnInit {
         this.saving.set(false);
         this.closeForm();
         this.refresh();
+        this.refreshService.triggerRefresh();
       },
       error: () => this.saving.set(false),
     });
   }
 
-  movementTypeLabel(value: 0 | 1 | 2 | 3): string {
+  movementTypeLabel(value: number): string {
+    if (value === 4) return 'Kâr Gerçekleştirme';
     return MOVEMENT_TYPES.find((t) => t.value === value)?.label ?? '';
   }
 
@@ -136,21 +142,23 @@ export class KasaComponent implements OnInit {
     return 'horizontal_rule';
   }
 
-  onDelete(movement: SafeMovement): void {
-    if (!confirm(`${this.movementTypeLabel(movement.movementType)} hareketini silmek istediğinize emin misiniz?`)) {
-      return;
-    }
+  async onDelete(movement: SafeMovement): Promise<void> {
+    const label = this.movementTypeLabel(movement.movementType);
+    const confirmed = await this.notify.confirmDelete(`"${label}" hareketini silmek istediğinize emin misiniz?`);
+    if (!confirmed) return;
 
     this.deleting.set(movement.id);
     this.api.deleteMovement(movement.id).subscribe({
       next: () => {
         this.deleting.set(null);
+        this.notify.success('Hareket silindi');
         this.refresh();
+        this.refreshService.triggerRefresh();
       },
       error: (err) => {
         this.deleting.set(null);
         const errorMsg = err?.error?.message || err?.error || 'Hareket silinirken bir hata oluştu.';
-        alert(errorMsg);
+        this.notify.error('Silme Hatası', errorMsg);
       }
     });
   }

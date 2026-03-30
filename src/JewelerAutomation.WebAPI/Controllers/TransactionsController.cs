@@ -314,12 +314,29 @@ public class TransactionsController : ControllerBase
         var transaction = await _unitOfWork.Transactions.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (transaction == null) return NotFound();
 
-        var safeMovements = await _unitOfWork.SafeMovements.GetAllAsync(cancellationToken).ConfigureAwait(false);
-        var relatedMovements = safeMovements.Where(m => m.SourceTransactionId == id).ToList();
-        foreach (var m in relatedMovements)
+        // Find SafeMovements by SourceTransactionId
+        var allMovements = await _unitOfWork.SafeMovements.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var relatedBySource = allMovements.Where(m => m.SourceTransactionId == id).ToList();
+        foreach (var m in relatedBySource)
             _unitOfWork.SafeMovements.Delete(m);
 
-        await _ledger.DeleteEntriesByReferenceAsync(LedgerReferenceType.Transaction, id, cancellationToken).ConfigureAwait(false);
+        // Also find SafeMovements by CorrelationId (catches ProfitRealization entries)
+        if (transaction.CorrelationId.HasValue)
+        {
+            var relatedByCorrelation = await _unitOfWork.SafeMovements
+                .FindByCorrelationIdAsync(transaction.CorrelationId.Value, cancellationToken).ConfigureAwait(false);
+            foreach (var m in relatedByCorrelation)
+            {
+                if (relatedBySource.All(r => r.Id != m.Id))
+                    _unitOfWork.SafeMovements.Delete(m);
+            }
+
+            await _ledger.DeleteEntriesByCorrelationAsync(transaction.CorrelationId.Value, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await _ledger.DeleteEntriesByReferenceAsync(LedgerReferenceType.Transaction, id, cancellationToken).ConfigureAwait(false);
+        }
 
         _unitOfWork.Transactions.Delete(transaction);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

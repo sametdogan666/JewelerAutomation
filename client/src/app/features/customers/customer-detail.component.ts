@@ -12,6 +12,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { DecimalPipe } from '@angular/common';
 import { CustomersService, Customer } from '../../core/services/customers.service';
+import { NotificationService } from '../../core/services/notification.service';
+import { DashboardRefreshService } from '../../core/services/dashboard-refresh.service';
 import {
   CustomerAccountService,
   CustomerBalance,
@@ -52,6 +54,8 @@ export class CustomerDetailComponent implements OnInit {
   private customersApi = inject(CustomersService);
   private accountApi = inject(CustomerAccountService);
   private fb = inject(FormBuilder);
+  private notify = inject(NotificationService);
+  private refreshService = inject(DashboardRefreshService);
 
   customer = signal<Customer | null>(null);
   balance = signal<CustomerBalance | null>(null);
@@ -157,15 +161,17 @@ export class CustomerDetailComponent implements OnInit {
     });
   }
 
-  onDeleteTransaction(transaction: CustomerTransactionDto): void {
-    if (!confirm(`${this.transactionTypeLabel(transaction.transactionType)} işlemini silmek istediğinize emin misiniz?`)) {
-      return;
-    }
+  async onDeleteTransaction(transaction: CustomerTransactionDto): Promise<void> {
+    const label = this.transactionTypeLabel(transaction.transactionType);
+    const confirmed = await this.notify.confirmDelete(`"${label}" işlemini silmek istediğinize emin misiniz?`);
+    if (!confirmed) return;
 
     this.deleting.set(transaction.id);
     this.accountApi.deleteTransaction(transaction.id).subscribe({
       next: () => {
         this.deleting.set(null);
+        this.notify.success('İşlem silindi');
+        this.refreshService.triggerRefresh();
         const customerId = this.customerId();
         if (customerId) {
           this.loadAccount(customerId);
@@ -173,7 +179,7 @@ export class CustomerDetailComponent implements OnInit {
       },
       error: () => {
         this.deleting.set(null);
-        alert('Hareket silinirken bir hata oluştu.');
+        this.notify.error('Silme Hatası', 'Hareket silinirken bir hata oluştu.');
       }
     });
   }

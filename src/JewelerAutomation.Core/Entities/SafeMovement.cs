@@ -30,5 +30,6 @@ public enum SafeMovementType
     Income = 0,
     Expense = 1,
     Capital = 2,
-    Transfer = 3
+    Transfer = 3,
+    ProfitRealization = 4
 }

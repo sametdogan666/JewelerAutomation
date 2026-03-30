@@ -29,5 +29,9 @@ public record SafeStatus(
     decimal NetCashPosition,
 
     // Profit (reporting-only metric)
-    decimal ProfitHasGram
+    decimal ProfitHasGram,
+
+    // Cumulative Performance (from all ProfitRealization entries)
+    decimal CumulativePeggingProfitHasGram,
+    int PeggingCount
 );

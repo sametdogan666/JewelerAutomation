@@ -1,10 +1,12 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
+import { Subscription } from 'rxjs';
 import { CapitalService, CapitalSummary } from '../../core/services/capital.service';
+import { DashboardRefreshService } from '../../core/services/dashboard-refresh.service';
 import { ProfitAnalysisDialogComponent } from '../profit-analysis/profit-analysis-dialog.component';
 
 @Component({
@@ -314,15 +316,22 @@ import { ProfitAnalysisDialogComponent } from '../profit-analysis/profit-analysi
     }
   `]
 })
-export class ProfitWidgetComponent implements OnInit {
+export class ProfitWidgetComponent implements OnInit, OnDestroy {
   private capitalService = inject(CapitalService);
   private dialog = inject(MatDialog);
+  private refreshService = inject(DashboardRefreshService);
+  private refreshSub?: Subscription;
 
   capitalSummary = signal<CapitalSummary | null>(null);
   loading = signal(true);
 
   ngOnInit(): void {
     this.loadData();
+    this.refreshSub = this.refreshService.refresh$.subscribe(() => this.loadData());
+  }
+
+  ngOnDestroy(): void {
+    this.refreshSub?.unsubscribe();
   }
 
   loadData(): void {

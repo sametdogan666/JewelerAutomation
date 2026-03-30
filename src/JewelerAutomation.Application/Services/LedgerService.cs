@@ -165,6 +165,9 @@ public class LedgerService : ILedgerService
         string? description,
         CancellationToken cancellationToken = default)
     {
+        if (movementType == SafeMovementType.ProfitRealization)
+            return;
+
         var entryType = movementType switch
         {
             SafeMovementType.Income => LedgerEntryType.GoldIn,

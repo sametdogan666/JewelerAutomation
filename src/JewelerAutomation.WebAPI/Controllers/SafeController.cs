@@ -91,7 +91,9 @@ public class SafeController : ControllerBase
             s.PersonalGoldReceivable,
             s.NetGoldPosition,
             s.NetCashPosition,
-            s.ProfitHasGram
+            s.ProfitHasGram,
+            s.CumulativePeggingProfitHasGram,
+            s.PeggingCount
         ));
     }
 
@@ -106,6 +108,8 @@ public class SafeController : ControllerBase
 
         if (movement.SourceTransactionId != null)
             return BadRequest("Transaction'dan oluşan hareketler düzenlenemez.");
+        if (movement.CorrelationId != null)
+            return BadRequest("Nakit bağlama ile oluşturulan hareketler düzenlenemez. Bağlama kaydını güncelleyin.");
 
         var hasGram = _accounting.CalculateHasGram(dto.Gram, dto.Milyem);
         movement.TransactionDate = dto.TransactionDate;
@@ -145,6 +149,8 @@ public class SafeController : ControllerBase
 
         if (movement.SourceTransactionId != null)
             return BadRequest("Transaction'dan oluşan hareketler silinemez. Önce transaction'ı siliniz.");
+        if (movement.CorrelationId != null)
+            return BadRequest("Nakit bağlama ile oluşturulan hareketler silinemez. Bağlama kaydını silin.");
 
         await _ledger.DeleteEntriesByReferenceAsync(
             LedgerReferenceType.SafeMovement, id, cancellationToken
@@ -170,5 +176,7 @@ public record SafeStatusDto(
     decimal PersonalGoldReceivable,
     decimal NetGoldPosition,
     decimal NetCashPosition,
-    decimal ProfitHasGram
+    decimal ProfitHasGram,
+    decimal CumulativePeggingProfitHasGram,
+    int PeggingCount
 );

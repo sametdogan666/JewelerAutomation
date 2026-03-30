@@ -9,7 +9,7 @@ export interface SafeMovement {
   milyem: number;
   hasGram: number;
   description?: string;
-  movementType: 0 | 1 | 2 | 3; // Income, Expense, Capital, Transfer
+  movementType: 0 | 1 | 2 | 3 | 4; // Income, Expense, Capital, Transfer, ProfitRealization
   createdAt: string;
 }
 
@@ -18,7 +18,7 @@ export interface SafeMovementCreate {
   gram: number;
   milyem: number;
   description?: string;
-  movementType: 0 | 1 | 2 | 3;
+  movementType: 0 | 1 | 2 | 3 | 4;
 }
 
 export interface SafeStatus {
@@ -33,6 +33,8 @@ export interface SafeStatus {
   netGoldPosition: number;
   netCashPosition: number;
   profitHasGram: number;
+  cumulativePeggingProfitHasGram: number;
+  peggingCount: number;
 }
 
 @Injectable({ providedIn: 'root' })

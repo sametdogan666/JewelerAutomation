@@ -69,6 +69,8 @@ public class LedgerMigrationService : ILedgerMigrationService
         {
             if (sm.SourceTransactionId.HasValue)
                 continue;
+            if (sm.MovementType == SafeMovementType.ProfitRealization)
+                continue;
 
             await _ledgerService.RecordSafeMovementAsync(
                 transactionDate: sm.TransactionDate,

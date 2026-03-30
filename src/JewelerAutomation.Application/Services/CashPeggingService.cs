@@ -50,6 +50,8 @@ public class CashPeggingService : ICashPeggingService
 
         try
         {
+            var netProfitHasGram = simulation.NetProfitHasGram;
+
             var log = new CashPeggingLog
             {
                 Id = Guid.NewGuid(),
@@ -64,13 +66,14 @@ public class CashPeggingService : ICashPeggingService
                 PeriodEndDate = periodEnd,
                 TransactionProfitHasGram = simulation.TransactionProfitHasGram,
                 ExchangeRateProfitHasGram = 0,
-                NetProfitHasGram = simulation.NetProfitHasGram,
+                NetProfitHasGram = netProfitHasGram,
                 Notes = notes,
                 UserId = userId
             };
 
             await _unitOfWork.CashPeggingLogs.AddAsync(log, cancellationToken);
 
+            // ── Main pegging transaction (cash → gold) ──
             if (cashAmount != 0 && equivalentHasGram != 0)
             {
                 var transaction = new Transaction
@@ -87,7 +90,9 @@ public class CashPeggingService : ICashPeggingService
                     Description = description,
                     MilyemLabour = 0,
                     CustomerId = null,
-                    CorrelationId = correlationId
+                    CorrelationId = correlationId,
+                    NetHasGram = Math.Abs(equivalentHasGram),
+                    NetCashAmount = -Math.Abs(cashAmount)
                 };
 
                 await _unitOfWork.Transactions.AddAsync(transaction, cancellationToken);
@@ -119,12 +124,36 @@ public class CashPeggingService : ICashPeggingService
                 );
             }
 
+            // ── Profit realization (reporting-only — NO ledger entry) ──
+            // The profit is already inherent in the pegging purchase: equivalentHasGram > salesHasGram.
+            // Creating a separate GoldIn ledger entry would double-count this profit.
+            if (Math.Abs(netProfitHasGram) > 0.000001m)
+            {
+                var profitDesc = $"Kâr Gerçekleştirme ({periodStart:dd.MM.yyyy}–{periodEnd:dd.MM.yyyy}): " +
+                                 $"{(netProfitHasGram >= 0 ? "+" : "")}{netProfitHasGram:N6} Has Gr";
+
+                var profitMovement = new SafeMovement
+                {
+                    TransactionDate = peggingDate,
+                    Gram = Math.Abs(netProfitHasGram),
+                    Milyem = 1000m,
+                    HasGram = Math.Abs(netProfitHasGram),
+                    Description = profitDesc,
+                    MovementType = SafeMovementType.ProfitRealization,
+                    SourceTransactionId = null,
+                    CorrelationId = correlationId
+                };
+
+                await _unitOfWork.SafeMovements.AddAsync(profitMovement, cancellationToken);
+            }
+
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Cash pegging committed: LogId={LogId}, CorrelationId={CorrId}, Cash={Cash} TL → Gold={Gold} Has Gr",
-                log.Id, correlationId, cashAmount, equivalentHasGram);
+                "Cash pegging committed: LogId={LogId}, CorrelationId={CorrId}, " +
+                "Cash={Cash} TL → Gold={Gold} Has Gr, Profit={Profit} Has Gr",
+                log.Id, correlationId, cashAmount, equivalentHasGram, netProfitHasGram);
 
             return log;
         }
@@ -169,9 +198,12 @@ public class CashPeggingService : ICashPeggingService
 
         try
         {
+            var newNetProfitHas = newEquivalentHasGram - log.TransactionProfitHasGram;
+
             log.GoldPricePerGram = newGoldPricePerGram;
             log.EquivalentHasGram = newEquivalentHasGram;
             log.TotalCapitalHasGram = log.PhysicalGoldAtTime + newEquivalentHasGram;
+            log.NetProfitHasGram = newNetProfitHas;
             if (notes != null) log.Notes = notes;
             _unitOfWork.CashPeggingLogs.Update(log);
 
@@ -183,6 +215,8 @@ public class CashPeggingService : ICashPeggingService
                 tx.Quantity = Math.Abs(newEquivalentHasGram);
                 tx.HasGram = Math.Abs(newEquivalentHasGram);
                 tx.Price = Math.Abs(oldCash);
+                tx.NetHasGram = Math.Abs(newEquivalentHasGram);
+                tx.NetCashAmount = -Math.Abs(oldCash);
                 tx.Description = description;
                 _unitOfWork.Transactions.Update(tx);
             }
@@ -190,11 +224,23 @@ public class CashPeggingService : ICashPeggingService
             var linkedMovements = await _unitOfWork.SafeMovements.FindByCorrelationIdAsync(
                 log.CorrelationId, cancellationToken);
 
+            SafeMovement? profitMovement = null;
             foreach (var mv in linkedMovements)
             {
-                mv.Gram = Math.Abs(newEquivalentHasGram);
-                mv.HasGram = Math.Abs(newEquivalentHasGram);
-                mv.Description = description;
+                if (mv.MovementType == SafeMovementType.ProfitRealization)
+                {
+                    mv.Gram = Math.Abs(newNetProfitHas);
+                    mv.HasGram = Math.Abs(newNetProfitHas);
+                    mv.Description = $"Kâr Gerçekleştirme ({log.PeriodStartDate:dd.MM.yyyy}–{log.PeriodEndDate:dd.MM.yyyy}): " +
+                                     $"{(newNetProfitHas >= 0 ? "+" : "")}{newNetProfitHas:N6} Has Gr";
+                    profitMovement = mv;
+                }
+                else
+                {
+                    mv.Gram = Math.Abs(newEquivalentHasGram);
+                    mv.HasGram = Math.Abs(newEquivalentHasGram);
+                    mv.Description = description;
+                }
                 _unitOfWork.SafeMovements.Update(mv);
             }
 
@@ -217,12 +263,15 @@ public class CashPeggingService : ICashPeggingService
                 );
             }
 
+            // ProfitRealization is reporting-only — no ledger entry needed.
+
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Pegging updated: LogId={LogId}, CorrelationId={CorrId}, NewPrice={Price}, NewHas={Has}",
-                log.Id, log.CorrelationId, newGoldPricePerGram, newEquivalentHasGram);
+                "Pegging updated: LogId={LogId}, CorrelationId={CorrId}, NewPrice={Price}, " +
+                "NewHas={Has}, NewProfit={Profit}",
+                log.Id, log.CorrelationId, newGoldPricePerGram, newEquivalentHasGram, newNetProfitHas);
 
             return log;
         }

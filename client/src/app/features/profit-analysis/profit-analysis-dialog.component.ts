@@ -11,8 +11,10 @@ import { MatTableModule } from '@angular/material/table';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ProfitAnalysisService, PeggingSimulation } from '../../core/services/profit-analysis.service';
 import { GoldPriceService } from '../../core/services/gold-price.service';
+import { DashboardRefreshService } from '../../core/services/dashboard-refresh.service';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 
 @Component({
@@ -30,7 +32,8 @@ import { debounceTime, distinctUntilChanged } from 'rxjs';
     MatTableModule,
     MatSliderModule,
     MatProgressSpinnerModule,
-    MatDividerModule
+    MatDividerModule,
+    MatSnackBarModule
   ],
   template: `
     <div class="dialog-container">
@@ -997,6 +1000,8 @@ export class ProfitAnalysisDialogComponent implements OnInit {
   private readonly profitService = inject(ProfitAnalysisService);
   private readonly goldPriceService = inject(GoldPriceService);
   private readonly dialogRef = inject(MatDialogRef<ProfitAnalysisDialogComponent>);
+  private readonly snackBar = inject(MatSnackBar);
+  private readonly refreshService = inject(DashboardRefreshService);
 
   peggingForm = this.fb.group({
     periodStart: [new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), Validators.required],
@@ -1114,6 +1119,8 @@ export class ProfitAnalysisDialogComponent implements OnInit {
     const formValue = this.peggingForm.value;
     this.saving.set(true);
 
+    const sim = this.simulationResult();
+
     this.profitService.pegCash({
       periodStart: formValue.periodStart!.toISOString(),
       periodEnd: formValue.periodEnd!.toISOString(),
@@ -1122,13 +1129,29 @@ export class ProfitAnalysisDialogComponent implements OnInit {
     }).subscribe({
       next: () => {
         this.saving.set(false);
-        alert('✅ Nakit bağlama işlemi başarıyla kaydedildi!');
+
+        const cashStr = sim ? sim.periodCashBalance.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) : '?';
+        const hasStr = sim ? sim.cashEquivalentHasGram.toFixed(2) : '?';
+        const profitSign = (sim?.netProfitHasGram ?? 0) >= 0 ? '+' : '';
+        const profitStr = sim ? sim.netProfitHasGram.toFixed(2) : '?';
+
+        this.snackBar.open(
+          `İşlem Başarılı: ${cashStr} TL başarıyla ${hasStr} Has Grama bağlandı. Net Kâr: ${profitSign}${profitStr} gr.`,
+          'Tamam',
+          { duration: 8000, panelClass: 'snackbar-success', horizontalPosition: 'center', verticalPosition: 'top' }
+        );
+
+        this.refreshService.triggerRefresh();
         this.dialogRef.close(true);
       },
       error: (err) => {
         console.error('Pegging error:', err);
         this.saving.set(false);
-        alert('❌ Nakit bağlama hatası: ' + (err.error?.message || 'Bilinmeyen hata'));
+        this.snackBar.open(
+          'Nakit bağlama hatası: ' + (err.error?.message || 'Bilinmeyen hata'),
+          'Kapat',
+          { duration: 6000, panelClass: 'snackbar-error', horizontalPosition: 'center', verticalPosition: 'top' }
+        );
       }
     });
   }
