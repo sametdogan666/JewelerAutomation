@@ -128,6 +128,7 @@ export class KasaComponent implements OnInit {
 
   movementTypeLabel(value: number): string {
     if (value === 4) return 'Kâr Gerçekleştirme';
+    if (value === 5) return 'Nakit Bağlama Kârı (FIFO)';
     return MOVEMENT_TYPES.find((t) => t.value === value)?.label ?? '';
   }
 

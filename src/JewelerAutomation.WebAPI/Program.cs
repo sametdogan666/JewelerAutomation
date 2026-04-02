@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using JewelerAutomation.Application.Interfaces;
 using JewelerAutomation.Application.Services;
+using JewelerAutomation.Core.Entities;
 using JewelerAutomation.Infrastructure.Data;
 using JewelerAutomation.Infrastructure.Repositories;
 using JewelerAutomation.WebAPI.Services;
@@ -30,10 +31,15 @@ builder.Services.AddScoped<ICustomerTransactionRepository, CustomerTransactionRe
 builder.Services.AddScoped<ICashPeggingLogRepository, CashPeggingLogRepository>();
 builder.Services.AddScoped<ILedgerRepository, LedgerRepository>();
 builder.Services.AddScoped<ICashToGoldConversionRepository, CashToGoldConversionRepository>();
+builder.Services.AddScoped<IGoldTransactionRepository, GoldTransactionRepository>();
+builder.Services.AddScoped<ILinkingProcessRepository, LinkingProcessRepository>();
+builder.Services.AddScoped<IRepository<LinkingDetail>, LinkingDetailRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 builder.Services.AddScoped<IAccountingService, AccountingService>();
 builder.Services.AddScoped<ICashPeggingService, CashPeggingService>();
+builder.Services.AddScoped<IGoldLinkingService, GoldLinkingService>();
+builder.Services.AddScoped<IPeggingService, PeggingService>();
 builder.Services.AddScoped<ICapitalCalculationService, CapitalCalculationService>();
 builder.Services.AddScoped<ISafeStatusService, SafeStatusService>();
 builder.Services.AddScoped<IProfitCalculationService, ProfitCalculationService>();

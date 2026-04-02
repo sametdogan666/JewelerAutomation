@@ -29,9 +29,12 @@ public class CashPeggingService : ICashPeggingService
         decimal goldPricePerGram,
         string? notes = null,
         Guid? userId = null,
+        decimal? pegCashFromSafe = null,
+        decimal? pegHasGram = null,
         CancellationToken cancellationToken = default)
     {
-        var simulation = await SimulatePeggingAsync(periodStart, periodEnd, goldPricePerGram, cancellationToken);
+        var simulation = await SimulatePeggingAsync(
+            periodStart, periodEnd, goldPricePerGram, pegCashFromSafe, pegHasGram, cancellationToken);
 
         _logger.LogInformation(
             "Pegging: Sales={Sales}, Purchases={Purchases}, TxProfit={TxProfit}, " +
@@ -170,8 +173,19 @@ public class CashPeggingService : ICashPeggingService
         var log = await _unitOfWork.CashPeggingLogs.GetByIdAsync(peggingId, cancellationToken)
             ?? throw new InvalidOperationException($"CashPeggingLog {peggingId} not found.");
 
-        _unitOfWork.CashPeggingLogs.Delete(log);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            _unitOfWork.CashPeggingLogs.Delete(log);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.CommitTransactionAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+            _logger.LogError(ex, "Pegging delete failed, rolled back");
+            throw;
+        }
 
         _logger.LogInformation(
             "Pegging deleted (soft): LogId={LogId}, CorrelationId={CorrId} — cascaded to linked records",
@@ -299,10 +313,15 @@ public class CashPeggingService : ICashPeggingService
         DateTime periodStart,
         DateTime periodEnd,
         decimal goldPricePerGram,
+        decimal? pegCashFromSafe = null,
+        decimal? pegHasGram = null,
         CancellationToken cancellationToken = default)
     {
         if (goldPricePerGram <= 0)
             throw new ArgumentException("Has fiyatı sıfırdan büyük olmalıdır.", nameof(goldPricePerGram));
+
+        if (pegCashFromSafe is > 0 && pegHasGram is > 0)
+            throw new ArgumentException("Aynı anda hem nakit hem has hedefi verilemez.");
 
         // Period-specific transaction data
         var periodSummary = await _accounting.GetPeriodTransactionSummaryAsync(
@@ -313,14 +332,30 @@ public class CashPeggingService : ICashPeggingService
 
         // Period cash balance from ledger
         var periodBalances = await _ledger.GetBalancesByPeriodAsync(periodStart, periodEnd, cancellationToken);
-        var periodCash = periodBalances.TotalCashBalance;
+        var ledgerPeriodCash = Math.Round(periodBalances.TotalCashBalance, 2);
+        var safeCash = Math.Round(totalBalances.TotalCashBalance, 2);
 
         // Profit calculation (excludes physical gold inventory)
         var totalSalesHas = periodSummary.TotalSalesHasGram;
         var totalPurchasesHas = periodSummary.TotalPurchasesHasGram;
         var transactionProfitHas = totalSalesHas - totalPurchasesHas;
 
-        var cashEquivalentHas = periodCash / goldPricePerGram;
+        decimal cashAmount;
+        if (pegHasGram is > 0)
+        {
+            var needed = Math.Round(pegHasGram.Value * goldPricePerGram, 2);
+            cashAmount = Math.Min(needed, safeCash);
+        }
+        else if (pegCashFromSafe is > 0)
+        {
+            cashAmount = Math.Min(Math.Round(pegCashFromSafe.Value, 2), safeCash);
+        }
+        else
+        {
+            cashAmount = ledgerPeriodCash;
+        }
+
+        var cashEquivalentHas = goldPricePerGram > 0 ? cashAmount / goldPricePerGram : 0;
 
         var netProfitHasGram = cashEquivalentHas - transactionProfitHas;
         var netProfitTL = netProfitHasGram * goldPricePerGram;
@@ -328,22 +363,24 @@ public class CashPeggingService : ICashPeggingService
         _logger.LogInformation(
             "Simulate: Period={Start:yyyy-MM-dd} to {End:yyyy-MM-dd}, GoldPrice={Price}, " +
             "SalesHas={Sales}, PurchasesHas={Purchases}, TxProfit={TxProfit}, " +
-            "PeriodCash={Cash}, CashEquivHas={CashEquiv}, " +
+            "PegCash={Cash}, CashEquivHas={CashEquiv}, " +
             "NetProfitHas={NetProfit}, NetProfitTL={NetTL}, GoldInSafe={Safe}",
             periodStart, periodEnd, goldPricePerGram,
             totalSalesHas, totalPurchasesHas, transactionProfitHas,
-            periodCash, cashEquivalentHas,
+            cashAmount, cashEquivalentHas,
             netProfitHasGram, netProfitTL, totalBalances.TotalGoldBalance);
 
         return new PeggingSimulationResult(
-            PeriodCashBalance: Math.Round(periodCash, 2),
+            PeriodCashBalance: cashAmount,
             GoldBalanceInSafe: Math.Round(totalBalances.TotalGoldBalance, 6),
             CashEquivalentHasGram: Math.Round(cashEquivalentHas, 6),
             TotalSalesHasGram: Math.Round(totalSalesHas, 6),
             TotalPurchasesHasGram: Math.Round(totalPurchasesHas, 6),
             TransactionProfitHasGram: Math.Round(transactionProfitHas, 6),
             NetProfitHasGram: Math.Round(netProfitHasGram, 6),
-            NetProfitTL: Math.Round(netProfitTL, 2)
+            NetProfitTL: Math.Round(netProfitTL, 2),
+            SafeCashBalance: safeCash,
+            LedgerPeriodCashBalance: ledgerPeriodCash
         );
     }
 }

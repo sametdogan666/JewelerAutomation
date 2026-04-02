@@ -11,11 +11,16 @@ namespace JewelerAutomation.WebAPI.Controllers;
 [Authorize]
 public class ProfitAnalysisController : ControllerBase
 {
-    private readonly ICashPeggingService _pegging;
+    private readonly ICashPeggingService _cashPegging;
+    private readonly IPeggingService _pegging;
     private readonly IAccountingService _accounting;
 
-    public ProfitAnalysisController(ICashPeggingService pegging, IAccountingService accounting)
+    public ProfitAnalysisController(
+        ICashPeggingService cashPegging,
+        IPeggingService pegging,
+        IAccountingService accounting)
     {
+        _cashPegging = cashPegging;
         _pegging = pegging;
         _accounting = accounting;
     }
@@ -25,23 +30,44 @@ public class ProfitAnalysisController : ControllerBase
         [FromBody] SimulatePeggingRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _pegging.SimulatePeggingAsync(
+        var result = await _cashPegging.SimulatePeggingAsync(
             request.PeriodStart,
             request.PeriodEnd,
             request.GoldPricePerGram,
+            request.PegCashFromSafe,
+            request.PegHasGram,
             cancellationToken
         );
 
-        return Ok(new PeggingSimulationDto(
-            result.PeriodCashBalance,
-            result.GoldBalanceInSafe,
-            result.CashEquivalentHasGram,
-            result.TotalSalesHasGram,
-            result.TotalPurchasesHasGram,
-            result.TransactionProfitHasGram,
-            result.NetProfitHasGram,
-            result.NetProfitTL
-        ));
+        return Ok(MapToDto(result));
+    }
+
+    [HttpPost("simulate-unified")]
+    public async Task<ActionResult<UnifiedPeggingSimulationResponseDto>> SimulateUnified(
+        [FromBody] UnifiedPeggingSimulateApiRequest request,
+        CancellationToken cancellationToken)
+    {
+        var r = await _pegging.SimulateUnifiedAsync(
+            new UnifiedPeggingSimulateRequest(
+                request.PeriodStart,
+                request.PeriodEnd,
+                request.GoldPricePerGram,
+                request.PegCashFromSafe,
+                request.PegHasGram,
+                request.FifoTargetAmountGram),
+            cancellationToken);
+
+        return Ok(new UnifiedPeggingSimulationResponseDto(
+            MapToDto(r.Hybrid),
+            r.Fifo == null
+                ? null
+                : new FifoLinkingSimulationResponseDto(
+                    r.Fifo.TargetAmountGram,
+                    r.Fifo.TargetPricePerGram,
+                    r.Fifo.EstimatedProfitTl,
+                    r.Fifo.OpenHasPositionGram,
+                    r.Fifo.SufficientOpenPosition),
+            r.OpenHasPositionInPeriodGram));
     }
 
     [HttpPost("peg-cash")]
@@ -49,14 +75,15 @@ public class ProfitAnalysisController : ControllerBase
         [FromBody] CreatePeggingRequest request,
         CancellationToken cancellationToken)
     {
-        var log = await _pegging.CreatePeggingAsync(
+        var log = await _pegging.CreateHybridPeggingAsync(
             request.PeriodStart,
             request.PeriodEnd,
             request.GoldPricePerGram,
             request.Notes,
             null,
-            cancellationToken
-        );
+            request.PegCashFromSafe,
+            request.PegHasGram,
+            cancellationToken);
 
         return Ok(MapToDto(log));
     }
@@ -66,7 +93,7 @@ public class ProfitAnalysisController : ControllerBase
     {
         try
         {
-            await _pegging.DeletePeggingAsync(id, cancellationToken);
+            await _cashPegging.DeletePeggingAsync(id, cancellationToken);
             return NoContent();
         }
         catch (InvalidOperationException ex)
@@ -83,7 +110,7 @@ public class ProfitAnalysisController : ControllerBase
     {
         try
         {
-            var log = await _pegging.UpdatePeggingAsync(
+            var log = await _cashPegging.UpdatePeggingAsync(
                 id,
                 request.GoldPricePerGram,
                 request.Notes,
@@ -106,9 +133,9 @@ public class ProfitAnalysisController : ControllerBase
         IReadOnlyList<CashPeggingLog> logs;
 
         if (from.HasValue && to.HasValue)
-            logs = await _pegging.GetPeggingHistoryByDateRangeAsync(from.Value, to.Value, cancellationToken);
+            logs = await _cashPegging.GetPeggingHistoryByDateRangeAsync(from.Value, to.Value, cancellationToken);
         else
-            logs = await _pegging.GetPeggingHistoryAsync(cancellationToken);
+            logs = await _cashPegging.GetPeggingHistoryAsync(cancellationToken);
 
         return Ok(logs.Select(MapToDto).ToList());
     }
@@ -116,7 +143,7 @@ public class ProfitAnalysisController : ControllerBase
     [HttpGet("latest-pegging")]
     public async Task<ActionResult<CashPeggingLogDto>> GetLatestPegging(CancellationToken cancellationToken)
     {
-        var log = await _pegging.GetLatestPeggingAsync(cancellationToken);
+        var log = await _cashPegging.GetLatestPeggingAsync(cancellationToken);
         if (log == null) return NotFound();
         return Ok(MapToDto(log));
     }
@@ -166,19 +193,57 @@ public class ProfitAnalysisController : ControllerBase
         log.NetProfitHasGram,
         log.Notes
     );
+
+    private static PeggingSimulationDto MapToDto(PeggingSimulationResult r) => new(
+        r.PeriodCashBalance,
+        r.GoldBalanceInSafe,
+        r.CashEquivalentHasGram,
+        r.TotalSalesHasGram,
+        r.TotalPurchasesHasGram,
+        r.TransactionProfitHasGram,
+        r.NetProfitHasGram,
+        r.NetProfitTL,
+        r.SafeCashBalance,
+        r.LedgerPeriodCashBalance
+    );
 }
 
 public record SimulatePeggingRequest(
     DateTime PeriodStart,
     DateTime PeriodEnd,
-    decimal GoldPricePerGram
+    decimal GoldPricePerGram,
+    decimal? PegCashFromSafe = null,
+    decimal? PegHasGram = null
 );
+
+public record UnifiedPeggingSimulateApiRequest(
+    DateTime PeriodStart,
+    DateTime PeriodEnd,
+    decimal GoldPricePerGram,
+    decimal? PegCashFromSafe = null,
+    decimal? PegHasGram = null,
+    decimal? FifoTargetAmountGram = null
+);
+
+public record UnifiedPeggingSimulationResponseDto(
+    PeggingSimulationDto Hybrid,
+    FifoLinkingSimulationResponseDto? Fifo,
+    decimal OpenHasPositionInPeriodGram);
+
+public record FifoLinkingSimulationResponseDto(
+    decimal TargetAmountGram,
+    decimal TargetPricePerGram,
+    decimal EstimatedProfitTl,
+    decimal OpenHasPositionGram,
+    bool SufficientOpenPosition);
 
 public record CreatePeggingRequest(
     DateTime PeriodStart,
     DateTime PeriodEnd,
     decimal GoldPricePerGram,
-    string? Notes
+    string? Notes,
+    decimal? PegCashFromSafe = null,
+    decimal? PegHasGram = null
 );
 
 public record UpdatePeggingRequest(
@@ -194,7 +259,9 @@ public record PeggingSimulationDto(
     decimal TotalPurchasesHasGram,
     decimal TransactionProfitHasGram,
     decimal NetProfitHasGram,
-    decimal NetProfitTL
+    decimal NetProfitTL,
+    decimal SafeCashBalance,
+    decimal LedgerPeriodCashBalance
 );
 
 public record CashPeggingLogDto(

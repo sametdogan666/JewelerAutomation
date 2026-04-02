@@ -12,6 +12,22 @@ export interface PeggingSimulation {
   transactionProfitHasGram: number;
   netProfitHasGram: number;
   netProfitTL: number;
+  safeCashBalance: number;
+  ledgerPeriodCashBalance: number;
+}
+
+export interface FifoLinkingSimulation {
+  targetAmountGram: number;
+  targetPricePerGram: number;
+  estimatedProfitTl: number;
+  openHasPositionGram: number;
+  sufficientOpenPosition: boolean;
+}
+
+export interface UnifiedPeggingSimulation {
+  hybrid: PeggingSimulation;
+  fifo: FifoLinkingSimulation | null;
+  openHasPositionInPeriodGram: number;
 }
 
 export interface CashPeggingLog {
@@ -57,6 +73,17 @@ export interface SimulatePeggingRequest {
   periodStart: string;
   periodEnd: string;
   goldPricePerGram: number;
+  pegCashFromSafe?: number | null;
+  pegHasGram?: number | null;
+}
+
+export interface UnifiedSimulatePeggingRequest {
+  periodStart: string;
+  periodEnd: string;
+  goldPricePerGram: number;
+  pegCashFromSafe?: number | null;
+  pegHasGram?: number | null;
+  fifoTargetAmountGram?: number | null;
 }
 
 export interface CreatePeggingRequest {
@@ -64,6 +91,8 @@ export interface CreatePeggingRequest {
   periodEnd: string;
   goldPricePerGram: number;
   notes?: string;
+  pegCashFromSafe?: number | null;
+  pegHasGram?: number | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -73,6 +102,10 @@ export class ProfitAnalysisService {
 
   simulatePegging(request: SimulatePeggingRequest): Observable<PeggingSimulation> {
     return this.http.post<PeggingSimulation>(`${this.baseUrl}/simulate`, request);
+  }
+
+  simulateUnified(request: UnifiedSimulatePeggingRequest): Observable<UnifiedPeggingSimulation> {
+    return this.http.post<UnifiedPeggingSimulation>(`${this.baseUrl}/simulate-unified`, request);
   }
 
   pegCash(request: CreatePeggingRequest): Observable<CashPeggingLog> {

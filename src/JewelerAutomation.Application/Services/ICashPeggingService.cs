@@ -10,6 +10,8 @@ public interface ICashPeggingService
         decimal goldPricePerGram,
         string? notes = null,
         Guid? userId = null,
+        decimal? pegCashFromSafe = null,
+        decimal? pegHasGram = null,
         CancellationToken cancellationToken = default);
 
     Task DeletePeggingAsync(Guid peggingId, CancellationToken cancellationToken = default);
@@ -33,6 +35,8 @@ public interface ICashPeggingService
         DateTime periodStart,
         DateTime periodEnd,
         decimal goldPricePerGram,
+        decimal? pegCashFromSafe = null,
+        decimal? pegHasGram = null,
         CancellationToken cancellationToken = default);
 }
 
@@ -51,5 +55,7 @@ public record PeggingSimulationResult(
     decimal TotalPurchasesHasGram,
     decimal TransactionProfitHasGram,
     decimal NetProfitHasGram,
-    decimal NetProfitTL
+    decimal NetProfitTL,
+    decimal SafeCashBalance,
+    decimal LedgerPeriodCashBalance
 );

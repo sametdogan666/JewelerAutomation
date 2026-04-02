@@ -16,7 +16,9 @@ public enum LedgerReferenceType
     CustomerMovement,
     CashPegging,
     CashToGoldConversion,
-    ManualAdjustment
+    ManualAdjustment,
+    /// <summary>FIFO nakit bağlama işlemi (kasadan nakit çıkış + altın giriş).</summary>
+    LinkingProcess
 }
 
 public class LedgerEntry : BaseEntity

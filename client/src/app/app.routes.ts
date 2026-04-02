@@ -15,6 +15,7 @@ export const routes: Routes = [
       { path: 'customers/:id', loadComponent: () => import('./features/customers/customer-detail.component').then(m => m.CustomerDetailComponent) },
       { path: 'customers/:id/edit', loadComponent: () => import('./features/customers/customer-form.component').then(m => m.CustomerFormComponent) },
       { path: 'kasa', loadComponent: () => import('./features/kasa/kasa.component').then(m => m.KasaComponent) },
+      { path: 'linking-history', loadComponent: () => import('./features/linking/linking-history.component').then(m => m.LinkingHistoryComponent) },
       { path: 'transactions', loadComponent: () => import('./features/transactions/transactions-list.component').then(m => m.TransactionsListComponent) },
       { path: 'transactions/new', loadComponent: () => import('./features/transactions/transaction-form.component').then(m => m.TransactionFormComponent) },
       { path: 'transactions/:id/edit', loadComponent: () => import('./features/transactions/transaction-form.component').then(m => m.TransactionFormComponent) },

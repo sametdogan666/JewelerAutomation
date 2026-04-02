@@ -110,6 +110,10 @@ public class SafeController : ControllerBase
             return BadRequest("Transaction'dan oluşan hareketler düzenlenemez.");
         if (movement.CorrelationId != null)
             return BadRequest("Nakit bağlama ile oluşturulan hareketler düzenlenemez. Bağlama kaydını güncelleyin.");
+        if (movement.MovementType == SafeMovementType.LinkingProfit)
+            return BadRequest("FIFO nakit bağlama kârı hareketleri yalnızca Bağlantı Geçmişi ekranından iptal edilebilir.");
+        if (movement.MovementType == SafeMovementType.ProfitRealization && movement.CorrelationId != null)
+            return BadRequest("Bağlama ile oluşan kâr gerçekleştirme hareketleri yalnızca bağlama iptali ile kaldırılabilir.");
 
         var hasGram = _accounting.CalculateHasGram(dto.Gram, dto.Milyem);
         movement.TransactionDate = dto.TransactionDate;
@@ -151,6 +155,10 @@ public class SafeController : ControllerBase
             return BadRequest("Transaction'dan oluşan hareketler silinemez. Önce transaction'ı siliniz.");
         if (movement.CorrelationId != null)
             return BadRequest("Nakit bağlama ile oluşturulan hareketler silinemez. Bağlama kaydını silin.");
+        if (movement.MovementType == SafeMovementType.LinkingProfit)
+            return BadRequest("FIFO nakit bağlama kârı hareketleri yalnızca Bağlantı Geçmişi ekranından silinebilir.");
+        if (movement.MovementType == SafeMovementType.ProfitRealization && movement.CorrelationId != null)
+            return BadRequest("Bağlama ile oluşan kâr gerçekleştirme hareketleri yalnızca bağlama iptali ile silinebilir.");
 
         await _ledger.DeleteEntriesByReferenceAsync(
             LedgerReferenceType.SafeMovement, id, cancellationToken

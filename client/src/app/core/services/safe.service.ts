@@ -9,7 +9,7 @@ export interface SafeMovement {
   milyem: number;
   hasGram: number;
   description?: string;
-  movementType: 0 | 1 | 2 | 3 | 4; // Income, Expense, Capital, Transfer, ProfitRealization
+  movementType: 0 | 1 | 2 | 3 | 4 | 5; // Income, Expense, Capital, Transfer, ProfitRealization, LinkingProfit
   createdAt: string;
 }
 
@@ -18,7 +18,7 @@ export interface SafeMovementCreate {
   gram: number;
   milyem: number;
   description?: string;
-  movementType: 0 | 1 | 2 | 3 | 4;
+  movementType: 0 | 1 | 2 | 3 | 4 | 5;
 }
 
 export interface SafeStatus {

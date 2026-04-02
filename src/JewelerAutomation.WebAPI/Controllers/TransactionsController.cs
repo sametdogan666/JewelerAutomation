@@ -14,12 +14,18 @@ public class TransactionsController : ControllerBase
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAccountingService _accounting;
     private readonly ILedgerService _ledger;
+    private readonly IGoldLinkingService _goldLinking;
 
-    public TransactionsController(IUnitOfWork unitOfWork, IAccountingService accounting, ILedgerService ledger)
+    public TransactionsController(
+        IUnitOfWork unitOfWork,
+        IAccountingService accounting,
+        ILedgerService ledger,
+        IGoldLinkingService goldLinking)
     {
         _unitOfWork = unitOfWork;
         _accounting = accounting;
         _ledger = ledger;
+        _goldLinking = goldLinking;
     }
 
     [HttpGet]
@@ -187,6 +193,11 @@ public class TransactionsController : ControllerBase
         if (dto.Items == null || dto.Items.Count == 0)
             return BadRequest("Sepette en az bir kalem olmalıdır.");
 
+        if (await _goldLinking.HasPartialLinkForTransactionAsync(id, cancellationToken).ConfigureAwait(false))
+            return BadRequest("Bu işlemde kısmi FIFO nakit bağlantısı var; sepet güncellenemez.");
+
+        await _goldLinking.RemoveGoldTransactionsForTransactionAsync(id, cancellationToken).ConfigureAwait(false);
+
         // Remove old items
         if (transaction.Items.Any())
             _unitOfWork.Transactions.RemoveItems(transaction.Items.ToList());
@@ -302,6 +313,7 @@ public class TransactionsController : ControllerBase
         transaction.Milyem = 0;
 
         _unitOfWork.Transactions.Update(transaction);
+        await _goldLinking.RegisterSaleGoldPositionsAsync(transaction, cancellationToken).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         var saved = await _unitOfWork.Transactions.GetByIdAsync(transaction.Id, cancellationToken).ConfigureAwait(false);
@@ -313,6 +325,11 @@ public class TransactionsController : ControllerBase
     {
         var transaction = await _unitOfWork.Transactions.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (transaction == null) return NotFound();
+
+        if (await _goldLinking.HasPartialLinkForTransactionAsync(id, cancellationToken).ConfigureAwait(false))
+            return BadRequest("Bu işlemde kısmi FIFO nakit bağlantısı var; işlem silinemez.");
+
+        await _goldLinking.RemoveGoldTransactionsForTransactionAsync(id, cancellationToken).ConfigureAwait(false);
 
         // Find SafeMovements by SourceTransactionId
         var allMovements = await _unitOfWork.SafeMovements.GetAllAsync(cancellationToken).ConfigureAwait(false);

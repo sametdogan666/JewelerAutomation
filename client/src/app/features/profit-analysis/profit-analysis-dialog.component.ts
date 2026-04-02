@@ -15,7 +15,10 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ProfitAnalysisService, PeggingSimulation } from '../../core/services/profit-analysis.service';
 import { GoldPriceService } from '../../core/services/gold-price.service';
 import { DashboardRefreshService } from '../../core/services/dashboard-refresh.service';
+import { LinkingService, FifoLinkingSimulation } from '../../core/services/linking.service';
+import { RouterLink } from '@angular/router';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
+import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-profit-analysis-dialog',
@@ -33,7 +36,8 @@ import { debounceTime, distinctUntilChanged } from 'rxjs';
     MatSliderModule,
     MatProgressSpinnerModule,
     MatDividerModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    RouterLink
   ],
   template: `
     <div class="dialog-container">
@@ -97,15 +101,69 @@ import { debounceTime, distinctUntilChanged } from 'rxjs';
                   </mat-form-field>
 
                   <div class="slider-container">
-                    <div class="slider-label">Simülasyon Fiyatı</div>
+                    <div class="slider-label">Simülasyon Fiyatı (Hibrit + FIFO)</div>
                     <mat-slider min="5000" max="10000" step="50" discrete [displayWith]="formatSliderLabel" class="full-width">
                       <input matSliderThumb [value]="simulationPrice()" (valueChange)="onSimulationPriceChange($event)">
                     </mat-slider>
                     <div class="slider-value">{{ simulationPrice() | number:'1.0-0' }} ₺/gram</div>
                   </div>
+
+                  <div class="form-row hybrid-row">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Kasadan bağlanacak TL (opsiyonel)</mat-label>
+                      <input matInput type="number" formControlName="pegCashFromSafe" min="0" step="0.01">
+                      <mat-hint>Boşsa dönem nakdi. Kasadaki nakitle sınırlı.</mat-hint>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Hedef has gr (opsiyonel)</mat-label>
+                      <input matInput type="number" formControlName="pegHasGram" min="0" step="0.0001">
+                      <mat-hint>TL alanı ile aynı anda kullanmayın.</mat-hint>
+                    </mat-form-field>
+                  </div>
                 </div>
               </div>
             </form>
+
+            <!-- FIFO Nakit Bağlama -->
+            <div class="card fifo-card">
+              <div class="card-header">
+                <mat-icon>account_tree</mat-icon>
+                <h3>FIFO Nakit Bağlama</h3>
+              </div>
+              <div class="card-content">
+                <div class="fifo-open">
+                  <span class="fifo-open-label">Toplam Açık Has Pozisyonu</span>
+                  <span class="fifo-open-value">{{ openPositionGram() | number:'1.4-4' }} gr</span>
+                </div>
+                <div class="form-row fifo-row" [formGroup]="fifoForm">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Bağlanacak Has (gr)</mat-label>
+                    <input matInput type="number" formControlName="amount" min="0.0001" step="0.0001">
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Has fiyatı (TL/gr)</mat-label>
+                    <input matInput type="number" formControlName="price" min="1" step="1">
+                  </mat-form-field>
+                </div>
+                <div class="fifo-actions">
+                  <span class="fifo-hint">Dönem, fiyat veya bağlanacak has değiştikçe tahmini kâr güncellenir.</span>
+                  <a mat-button routerLink="/linking-history" class="fifo-link">Bağlantı Geçmişi</a>
+                </div>
+                @if (fifoSim(); as fs) {
+                  <div class="fifo-sim" [class.fifo-sim--bad]="!fs.sufficientOpenPosition">
+                    <div>Tahmini kâr/zarar (TL): <strong>{{ fs.estimatedProfitTl | number:'1.2-2' }}</strong></div>
+                    <div>Yaklaşık Has karşılığı: <strong>{{ fifoProfitHasGram(fs) | number:'1.2-2' }}</strong> gr</div>
+                    <div>Açık pozisyon yeterli: <strong>{{ fs.sufficientOpenPosition ? 'Evet' : 'Hayır' }}</strong></div>
+                  </div>
+                }
+                <button mat-raised-button color="accent" type="button" class="fifo-confirm"
+                        (click)="onConfirmFifo()" [disabled]="fifoSaving() || !canSubmitFifo()">
+                  @if (fifoSaving()) { <mat-spinner diameter="20"></mat-spinner> }
+                  @else { <mat-icon>check</mat-icon> }
+                  FIFO ile Bağla
+                </button>
+              </div>
+            </div>
 
             <!-- Transactions Card -->
             <div class="card">
@@ -222,8 +280,9 @@ import { debounceTime, distinctUntilChanged } from 'rxjs';
                         <mat-icon>account_balance_wallet</mat-icon>
                       </div>
                       <div class="info-content">
-                        <div class="info-label">Dönem Nakit Bakiye</div>
+                        <div class="info-label">Bağlamada kullanılacak nakit</div>
                         <div class="info-value">{{ result.periodCashBalance | number:'1.2-2' }} ₺</div>
+                        <div class="info-hint">Kasada: {{ result.safeCashBalance | number:'1.2-2' }} ₺ · Defter dönem nakdi: {{ result.ledgerPeriodCashBalance | number:'1.2-2' }} ₺</div>
                       </div>
                     </div>
 
@@ -455,6 +514,78 @@ import { debounceTime, distinctUntilChanged } from 'rxjs';
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
       margin-bottom: 1rem;
       overflow: hidden;
+    }
+
+    .fifo-card {
+      border: 1px solid #e1bee7;
+      background: linear-gradient(180deg, #faf5ff 0%, #fff 100%);
+    }
+
+    .fifo-open {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 0.75rem;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .fifo-open-label {
+      font-size: 0.85rem;
+      color: #4b5563;
+    }
+
+    .fifo-open-value {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #6a1b9a;
+    }
+
+    .fifo-row mat-form-field {
+      flex: 1;
+      min-width: 120px;
+    }
+
+    .fifo-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 0.5rem 0;
+    }
+
+    .fifo-sim {
+      margin: 0.75rem 0;
+      padding: 0.75rem;
+      border-radius: 8px;
+      background: #f3e5f5;
+      font-size: 0.9rem;
+      color: #374151;
+    }
+
+    .fifo-sim--bad {
+      border: 1px solid #e57373;
+      background: #ffebee;
+    }
+
+    .fifo-confirm {
+      width: 100%;
+      margin-top: 0.5rem;
+    }
+
+    .fifo-link {
+      font-size: 0.85rem;
+    }
+
+    .fifo-hint {
+      font-size: 0.8rem;
+      color: #6b7280;
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .hybrid-row {
+      margin-top: 0.75rem;
     }
 
     .card-header {
@@ -1002,13 +1133,25 @@ export class ProfitAnalysisDialogComponent implements OnInit {
   private readonly dialogRef = inject(MatDialogRef<ProfitAnalysisDialogComponent>);
   private readonly snackBar = inject(MatSnackBar);
   private readonly refreshService = inject(DashboardRefreshService);
+  private readonly linkingService = inject(LinkingService);
 
   peggingForm = this.fb.group({
     periodStart: [new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), Validators.required],
     periodEnd: [new Date(), Validators.required],
     goldPrice: [7000, [Validators.required, Validators.min(1)]],
+    pegCashFromSafe: [null as number | null],
+    pegHasGram: [null as number | null],
     notes: ['']
   });
+
+  fifoForm = this.fb.group({
+    amount: [null as number | null],
+    price: [7000, [Validators.required, Validators.min(1)]],
+  });
+
+  openPositionGram = signal(0);
+  fifoSim = signal<FifoLinkingSimulation | null>(null);
+  fifoSaving = signal(false);
 
   simulationPrice = signal(7000);
   simulationResult = signal<PeggingSimulation | null>(null);
@@ -1021,25 +1164,28 @@ export class ProfitAnalysisDialogComponent implements OnInit {
   formatSliderLabel = (value: number) => `${value.toLocaleString('tr-TR')} TL`;
 
   ngOnInit(): void {
-    console.log('[PROFIT-DIALOG] Component initialized');
-    
-    // İlk has fiyatını yükle
     this.loadGoldPrice();
-    
-    // İlk hesaplamayı yap
-    this.loadPeriodSummary();
-    this.runSimulation();
 
-    // Form değişimlerini dinle (debounce ile)
+    this.loadPeriodSummary();
+    this.runUnifiedSimulation();
+
+    this.peggingForm.get('goldPrice')?.valueChanges.subscribe((v) => {
+      if (v != null && v > 0) {
+        this.simulationPrice.set(v);
+        this.fifoForm.patchValue({ price: v }, { emitEvent: false });
+      }
+    });
+
     this.peggingForm.valueChanges
-      .pipe(
-        debounceTime(500),
-        distinctUntilChanged()
-      )
+      .pipe(debounceTime(400), distinctUntilChanged())
       .subscribe(() => {
-        this.runSimulation();
+        this.runUnifiedSimulation();
         this.loadPeriodSummary();
       });
+
+    this.fifoForm.valueChanges
+      .pipe(debounceTime(400), distinctUntilChanged())
+      .subscribe(() => this.runUnifiedSimulation());
   }
 
   loadGoldPrice(): void {
@@ -1047,48 +1193,71 @@ export class ProfitAnalysisDialogComponent implements OnInit {
       next: (priceData) => {
         const price = priceData.selling;
         this.peggingForm.patchValue({ goldPrice: price }, { emitEvent: false });
+        this.fifoForm.patchValue({ price }, { emitEvent: false });
         this.simulationPrice.set(price);
-        this.runSimulation();
+        this.runUnifiedSimulation();
       },
       error: () => {
         this.peggingForm.patchValue({ goldPrice: 7000 }, { emitEvent: false });
+        this.fifoForm.patchValue({ price: 7000 }, { emitEvent: false });
         this.simulationPrice.set(7000);
-        this.runSimulation();
+        this.runUnifiedSimulation();
       }
     });
   }
 
   onSimulationPriceChange(value: number): void {
     this.simulationPrice.set(value);
-    this.runSimulationWithPrice(value);
+    this.peggingForm.patchValue({ goldPrice: value }, { emitEvent: false });
+    this.fifoForm.patchValue({ price: value }, { emitEvent: false });
+    this.runUnifiedSimulation();
   }
 
-  runSimulation(): void {
-    const price = this.peggingForm.value.goldPrice || 7000;
-    this.runSimulationWithPrice(price);
-  }
-
-  runSimulationWithPrice(price: number): void {
+  runUnifiedSimulation(): void {
     const start = this.peggingForm.value.periodStart;
     const end = this.peggingForm.value.periodEnd;
-    
     if (!start || !end) return;
 
+    const price = this.simulationPrice();
+    const pf = this.peggingForm.value;
+    const ff = this.fifoForm.getRawValue();
+    const fifoTarget =
+      ff.amount != null && ff.amount > 0 ? ff.amount : null;
+
     this.simulating.set(true);
-    this.profitService.simulatePegging({
-      periodStart: start.toISOString(),
-      periodEnd: end.toISOString(),
-      goldPricePerGram: price
-    }).subscribe({
-      next: (result) => {
-        this.simulationResult.set(result);
-        this.simulating.set(false);
-      },
-      error: (err) => {
-        console.error('Simulation error:', err);
-        this.simulating.set(false);
-      }
-    });
+    this.profitService
+      .simulateUnified({
+        periodStart: start.toISOString(),
+        periodEnd: end.toISOString(),
+        goldPricePerGram: price,
+        pegCashFromSafe: pf.pegCashFromSafe ?? undefined,
+        pegHasGram: pf.pegHasGram ?? undefined,
+        fifoTargetAmountGram: fifoTarget ?? undefined,
+      })
+      .subscribe({
+        next: (r) => {
+          this.simulationResult.set(r.hybrid);
+          this.openPositionGram.set(r.openHasPositionInPeriodGram);
+          this.fifoSim.set(r.fifo);
+          this.simulating.set(false);
+        },
+        error: (err) => {
+          console.error('Unified simulation error:', err);
+          this.simulating.set(false);
+        },
+      });
+  }
+
+  fifoProfitHasGram(fs: FifoLinkingSimulation): number {
+    const p = this.fifoForm.getRawValue().price;
+    if (!p || p <= 0) return 0;
+    return fs.estimatedProfitTl / p;
+  }
+
+  canSubmitFifo(): boolean {
+    const ff = this.fifoForm.getRawValue();
+    const p = ff.price;
+    return ff.amount != null && ff.amount > 0 && p != null && p > 0;
   }
 
   loadPeriodSummary(): void {
@@ -1113,46 +1282,132 @@ export class ProfitAnalysisDialogComponent implements OnInit {
     });
   }
 
-  onConfirmPegging(): void {
+  async onConfirmFifo(): Promise<void> {
+    const v = this.fifoForm.getRawValue();
+    if (!this.canSubmitFifo() || v.amount == null) return;
+    const price = v.price;
+    if (price == null || price <= 0) return;
+
+    const start = this.peggingForm.value.periodStart;
+    const end = this.peggingForm.value.periodEnd;
+    if (!start || !end) return;
+
+    const fs = this.fifoSim();
+    const cashTotal = Math.round(v.amount * price * 1000) / 1000;
+    const profitG = fs && price > 0 ? fs.estimatedProfitTl / price : 0;
+    const profitSign = profitG >= 0 ? '+' : '';
+
+    const confirm = await Swal.fire({
+      title: 'FIFO nakit bağlama',
+      html:
+        `<p>Seçili dönem FIFO ile <strong>${v.amount.toLocaleString('tr-TR', { maximumFractionDigits: 4 })} Has</strong> bağlanacak.</p>` +
+        `<p>Toplam <strong>${cashTotal.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} TL</strong> ` +
+        `<strong>${price.toLocaleString('tr-TR')}</strong> TL/gr fiyatıyla.</p>` +
+        `<p>Beklenen kâr/zarar: yaklaşık <strong>${profitSign}${profitG.toFixed(2)}</strong> Has gr ` +
+        `(${fs ? fs.estimatedProfitTl.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) : '—'} TL).</p>` +
+        `<p>Onaylıyor musunuz?</p>`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Evet, bağla',
+      cancelButtonText: 'Vazgeç',
+    });
+    if (!confirm.isConfirmed) return;
+
+    this.fifoSaving.set(true);
+    const notes = this.peggingForm.value.notes || undefined;
+    this.linkingService
+      .process({
+        targetAmountGram: v.amount,
+        targetPricePerGram: price,
+        notes,
+        periodStart: start.toISOString(),
+        periodEnd: end.toISOString(),
+      })
+      .subscribe({
+        next: (r) => {
+          this.fifoSaving.set(false);
+          this.snackBar.open(
+            `FIFO bağlama tamamlandı. Tahmini kâr: ${r.totalProfit.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} TL.`,
+            'Tamam',
+            { duration: 8000, panelClass: 'snackbar-success', horizontalPosition: 'center', verticalPosition: 'top' }
+          );
+          this.refreshService.triggerRefresh();
+          this.fifoSim.set(null);
+          this.dialogRef.close(true);
+        },
+        error: (err) => {
+          this.fifoSaving.set(false);
+          this.snackBar.open(
+            err?.error?.message || err?.message || 'FIFO bağlama hatası',
+            'Kapat',
+            { duration: 6000, panelClass: 'snackbar-error', horizontalPosition: 'center', verticalPosition: 'top' }
+          );
+        },
+      });
+  }
+
+  async onConfirmPegging(): Promise<void> {
     if (this.peggingForm.invalid) return;
 
     const formValue = this.peggingForm.value;
+    const sim = this.simulationResult();
+    const price = this.simulationPrice();
+    const cash = sim?.periodCashBalance ?? 0;
+    const profitG = sim?.netProfitHasGram ?? 0;
+    const profitSign = profitG >= 0 ? '+' : '';
+
+    const confirm = await Swal.fire({
+      title: 'Hibrit nakit bağlama',
+      html:
+        `<p>Toplam <strong>${cash.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} TL</strong> ` +
+        `<strong>${price.toLocaleString('tr-TR')}</strong> TL/gr fiyatından hasa çevrilecek.</p>` +
+        `<p>Beklenen net kâr/zarar: <strong>${profitSign}${profitG.toFixed(2)}</strong> Has gr.</p>` +
+        `<p>Onaylıyor musunuz?</p>`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Evet, kaydet',
+      cancelButtonText: 'Vazgeç',
+    });
+    if (!confirm.isConfirmed) return;
+
     this.saving.set(true);
 
-    const sim = this.simulationResult();
+    this.profitService
+      .pegCash({
+        periodStart: formValue.periodStart!.toISOString(),
+        periodEnd: formValue.periodEnd!.toISOString(),
+        goldPricePerGram: price,
+        notes: formValue.notes || undefined,
+        pegCashFromSafe: formValue.pegCashFromSafe ?? undefined,
+        pegHasGram: formValue.pegHasGram ?? undefined,
+      })
+      .subscribe({
+        next: () => {
+          this.saving.set(false);
 
-    this.profitService.pegCash({
-      periodStart: formValue.periodStart!.toISOString(),
-      periodEnd: formValue.periodEnd!.toISOString(),
-      goldPricePerGram: formValue.goldPrice!,
-      notes: formValue.notes || undefined
-    }).subscribe({
-      next: () => {
-        this.saving.set(false);
+          const cashStr = sim ? sim.periodCashBalance.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) : '?';
+          const hasStr = sim ? sim.cashEquivalentHasGram.toFixed(2) : '?';
+          const ps = (sim?.netProfitHasGram ?? 0) >= 0 ? '+' : '';
+          const profitStr = sim ? sim.netProfitHasGram.toFixed(2) : '?';
 
-        const cashStr = sim ? sim.periodCashBalance.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) : '?';
-        const hasStr = sim ? sim.cashEquivalentHasGram.toFixed(2) : '?';
-        const profitSign = (sim?.netProfitHasGram ?? 0) >= 0 ? '+' : '';
-        const profitStr = sim ? sim.netProfitHasGram.toFixed(2) : '?';
+          this.snackBar.open(
+            `İşlem başarılı: ${cashStr} TL → ${hasStr} Has gr. Net: ${ps}${profitStr} gr.`,
+            'Tamam',
+            { duration: 8000, panelClass: 'snackbar-success', horizontalPosition: 'center', verticalPosition: 'top' }
+          );
 
-        this.snackBar.open(
-          `İşlem Başarılı: ${cashStr} TL başarıyla ${hasStr} Has Grama bağlandı. Net Kâr: ${profitSign}${profitStr} gr.`,
-          'Tamam',
-          { duration: 8000, panelClass: 'snackbar-success', horizontalPosition: 'center', verticalPosition: 'top' }
-        );
-
-        this.refreshService.triggerRefresh();
-        this.dialogRef.close(true);
-      },
-      error: (err) => {
-        console.error('Pegging error:', err);
-        this.saving.set(false);
-        this.snackBar.open(
-          'Nakit bağlama hatası: ' + (err.error?.message || 'Bilinmeyen hata'),
-          'Kapat',
-          { duration: 6000, panelClass: 'snackbar-error', horizontalPosition: 'center', verticalPosition: 'top' }
-        );
-      }
-    });
+          this.refreshService.triggerRefresh();
+          this.dialogRef.close(true);
+        },
+        error: (err) => {
+          console.error('Pegging error:', err);
+          this.saving.set(false);
+          this.snackBar.open(
+            'Nakit bağlama hatası: ' + (err.error?.message || 'Bilinmeyen hata'),
+            'Kapat',
+            { duration: 6000, panelClass: 'snackbar-error', horizontalPosition: 'center', verticalPosition: 'top' }
+          );
+        },
+      });
   }
 }

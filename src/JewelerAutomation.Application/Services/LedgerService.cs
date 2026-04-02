@@ -174,6 +174,7 @@ public class LedgerService : ILedgerService
             SafeMovementType.Expense => LedgerEntryType.GoldOut,
             SafeMovementType.Capital => LedgerEntryType.GoldIn,
             SafeMovementType.Transfer => goldHasAmount >= 0 ? LedgerEntryType.GoldIn : LedgerEntryType.GoldOut,
+            SafeMovementType.LinkingProfit => LedgerEntryType.GoldIn,
             _ => throw new ArgumentException($"Unknown movement type: {movementType}")
         };
 
@@ -185,6 +186,39 @@ public class LedgerService : ILedgerService
             CashAmount = 0,
             ReferenceType = LedgerReferenceType.SafeMovement,
             ReferenceId = referenceId,
+            CustomerId = null,
+            Description = description
+        }, cancellationToken);
+    }
+
+    public async Task RecordLinkingFifoPurchaseAsync(
+        DateTime transactionDate,
+        decimal cashAmount,
+        decimal goldHasAmount,
+        Guid linkingProcessId,
+        string? description,
+        CancellationToken cancellationToken = default)
+    {
+        await _unitOfWork.Ledger.AddAsync(new LedgerEntry
+        {
+            TransactionDate = transactionDate,
+            EntryType = LedgerEntryType.CashOut,
+            GoldHasAmount = 0,
+            CashAmount = cashAmount,
+            ReferenceType = LedgerReferenceType.LinkingProcess,
+            ReferenceId = linkingProcessId,
+            CustomerId = null,
+            Description = description
+        }, cancellationToken);
+
+        await _unitOfWork.Ledger.AddAsync(new LedgerEntry
+        {
+            TransactionDate = transactionDate,
+            EntryType = LedgerEntryType.GoldIn,
+            GoldHasAmount = goldHasAmount,
+            CashAmount = 0,
+            ReferenceType = LedgerReferenceType.LinkingProcess,
+            ReferenceId = linkingProcessId,
             CustomerId = null,
             Description = description
         }, cancellationToken);

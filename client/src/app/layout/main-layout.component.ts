@@ -39,6 +39,7 @@ export class MainLayoutComponent {
     { path: '/transactions', icon: 'shopping_cart', label: 'İşlemler' },
     { path: '/customers', icon: 'people', label: 'Cariler' },
     { path: '/kasa', icon: 'account_balance_wallet', label: 'Kasa' },
+    { path: '/linking-history', icon: 'history', label: 'Bağlantı Geçmişi' },
   ];
 
   constructor() {

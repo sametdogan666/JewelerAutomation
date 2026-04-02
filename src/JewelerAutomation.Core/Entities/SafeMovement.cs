@@ -31,5 +31,7 @@ public enum SafeMovementType
     Expense = 1,
     Capital = 2,
     Transfer = 3,
-    ProfitRealization = 4
+    ProfitRealization = 4,
+    /// <summary>Parçalı FIFO nakit bağlama kârı — kasadan doğrudan silinmez.</summary>
+    LinkingProfit = 5
 }

@@ -63,6 +63,15 @@ public interface ILedgerService
         string? description,
         CancellationToken cancellationToken = default);
 
+    /// <summary>FIFO nakit bağlama: kasadan nakit çıkış + satın alınan has altın girişi.</summary>
+    Task RecordLinkingFifoPurchaseAsync(
+        DateTime transactionDate,
+        decimal cashAmount,
+        decimal goldHasAmount,
+        Guid linkingProcessId,
+        string? description,
+        CancellationToken cancellationToken = default);
+
     Task<LedgerBalances> GetBalancesAsync(CancellationToken cancellationToken = default);
     Task<LedgerBalances> GetBalancesByPeriodAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
     Task<CustomerLedgerBalances> GetCustomerBalancesAsync(Guid customerId, CancellationToken cancellationToken = default);

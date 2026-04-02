@@ -19,6 +19,9 @@ public class AppDbContext : DbContext
     public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
     public DbSet<CashToGoldConversion> CashToGoldConversions => Set<CashToGoldConversion>();
     public DbSet<TransactionItem> TransactionItems => Set<TransactionItem>();
+    public DbSet<GoldTransaction> GoldTransactions => Set<GoldTransaction>();
+    public DbSet<LinkingProcess> LinkingProcesses => Set<LinkingProcess>();
+    public DbSet<LinkingDetail> LinkingDetails => Set<LinkingDetail>();
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -232,6 +235,36 @@ public class AppDbContext : DbContext
             e.HasIndex(x => x.TransactionDate);
             e.HasIndex(x => x.CustomerId);
             e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        const int linkPrecision = 18;
+        const int linkScale = 4;
+
+        modelBuilder.Entity<GoldTransaction>(e =>
+        {
+            e.HasOne(x => x.Transaction).WithMany().HasForeignKey(x => x.TransactionId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.TransactionItem).WithMany().HasForeignKey(x => x.TransactionItemId).OnDelete(DeleteBehavior.SetNull);
+            e.Property(x => x.OriginalHasGram).HasPrecision(linkPrecision, linkScale);
+            e.Property(x => x.RemainingGram).HasPrecision(linkPrecision, linkScale);
+            e.HasIndex(x => x.TransactionId);
+            e.HasIndex(x => new { x.IsFullyLinked, x.RemainingGram });
+        });
+
+        modelBuilder.Entity<LinkingProcess>(e =>
+        {
+            e.HasOne(x => x.SafeMovement).WithMany().HasForeignKey(x => x.SafeMovementId).OnDelete(DeleteBehavior.SetNull);
+            e.Property(x => x.TargetAmount).HasPrecision(linkPrecision, linkScale);
+            e.Property(x => x.TargetPrice).HasPrecision(linkPrecision, linkScale);
+            e.Property(x => x.TotalProfit).HasPrecision(linkPrecision, linkScale);
+            e.Property(x => x.Notes).HasMaxLength(1024);
+            e.HasIndex(x => x.LinkingDate);
+        });
+
+        modelBuilder.Entity<LinkingDetail>(e =>
+        {
+            e.HasOne(x => x.LinkingProcess).WithMany(x => x.Details).HasForeignKey(x => x.LinkingProcessId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.GoldTransaction).WithMany().HasForeignKey(x => x.GoldTransactionId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.AmountDeducted).HasPrecision(linkPrecision, linkScale);
         });
     }
 
