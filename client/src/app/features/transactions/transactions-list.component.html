@@ -78,7 +78,9 @@
         <ng-container matColumnDef="itemCount">
           <th mat-header-cell *matHeaderCellDef>Kalem</th>
           <td mat-cell *matCellDef="let row">
-            <span class="item-count-badge">{{ row.items?.length || 1 }}</span>
+            <span class="item-count-badge" [class.item-count-badge--pegging]="isNakitBaglamaRow(row)">
+              {{ itemCountLabel(row) }}
+            </span>
           </td>
         </ng-container>
 
@@ -87,9 +89,10 @@
           <th mat-header-cell *matHeaderCellDef>Net Yön</th>
           <td mat-cell *matCellDef="let row">
             <span class="badge" [ngClass]="{
-              'badge-sale': row.netHasGram < 0,
-              'badge-purchase': row.netHasGram > 0,
-              'badge-neutral': row.netHasGram === 0
+              'badge-sale': !isNakitBaglamaRow(row) && row.netHasGram < 0,
+              'badge-purchase': !isNakitBaglamaRow(row) && row.netHasGram > 0,
+              'badge-neutral': !isNakitBaglamaRow(row) && row.netHasGram === 0,
+              'badge-pegging': isNakitBaglamaRow(row)
             }">
               {{ netLabel(row) }}
             </span>
@@ -99,16 +102,29 @@
         <!-- Net Has Gram -->
         <ng-container matColumnDef="netHasGram">
           <th mat-header-cell *matHeaderCellDef>Net Has Gr</th>
-          <td mat-cell *matCellDef="let row" [ngClass]="{'text-positive': row.netHasGram > 0, 'text-negative': row.netHasGram < 0}">
-            {{ row.netHasGram > 0 ? '+' : '' }}{{ row.netHasGram | number:'1.2-2' }}
+          <td mat-cell *matCellDef="let row" [ngClass]="{
+            'text-positive': isNakitBaglamaRow(row) || row.netHasGram > 0,
+            'text-negative': !isNakitBaglamaRow(row) && row.netHasGram < 0
+          }">
+            @if (isNakitBaglamaRow(row)) {
+              +{{ peggingEquivalentHasGram(row) | number:'1.2-2' }}
+            } @else {
+              {{ row.netHasGram > 0 ? '+' : '' }}{{ row.netHasGram | number:'1.2-2' }}
+            }
           </td>
         </ng-container>
 
         <!-- Net Nakit -->
         <ng-container matColumnDef="netCashAmount">
           <th mat-header-cell *matHeaderCellDef>Net Nakit (₺)</th>
-          <td mat-cell *matCellDef="let row" [ngClass]="{'text-positive': row.netCashAmount > 0, 'text-negative': row.netCashAmount < 0}">
-            @if (row.netCashAmount !== 0) {
+          <td mat-cell *matCellDef="let row" [ngClass]="{
+            'text-positive': !isNakitBaglamaRow(row) && row.netCashAmount > 0,
+            'text-negative': isNakitBaglamaRow(row) || (!isNakitBaglamaRow(row) && row.netCashAmount < 0)
+          }">
+            @if (isNakitBaglamaRow(row)) {
+              <span class="peg-cash">{{ peggingNetCashSigned(row) | number:'1.2-2' }} ₺</span>
+              <span class="peg-cash-hint">net nakit (kasadan)</span>
+            } @else if (row.netCashAmount != null && row.netCashAmount !== 0) {
               {{ row.netCashAmount > 0 ? '+' : '' }}{{ row.netCashAmount | number:'1.0-0' }} ₺
             } @else {
               <span class="text-muted">—</span>
@@ -198,6 +214,7 @@
         <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
         <tr mat-row *matRowDef="let row; columns: displayedColumns"
             class="table-row"
+            [class.table-row--pegging]="isNakitBaglamaRow(row)"
             [class.expanded-row]="expandedRow() === row.id"></tr>
         <tr mat-row *matRowDef="let row; columns: ['expandedDetail']"
             class="detail-row"

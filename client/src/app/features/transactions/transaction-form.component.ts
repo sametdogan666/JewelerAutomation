@@ -16,6 +16,7 @@ import {
   TransactionsService,
   BasketCreate,
   BasketItemCreate,
+  Transaction,
   TransactionDirection,
 } from '../../core/services/transactions.service';
 import { CustomersService, Customer } from '../../core/services/customers.service';
@@ -68,6 +69,13 @@ export class TransactionFormComponent implements OnInit {
   editMode = signal(false);
   transactionId = signal<string | null>(null);
 
+  /** Nakit bağlama (CorrelationId + kalem yok): sanal kalem + özet bu kayıttan beslenir. */
+  nakitBaglamaDetail = signal<{
+    cash: number;
+    equivalentHasGram: number;
+    goldPricePerGram: number;
+  } | null>(null);
+
   headerForm = this.fb.nonNullable.group({
     transactionDate: [new Date().toISOString().slice(0, 10), Validators.required],
     description: [''],
@@ -80,6 +88,13 @@ export class TransactionFormComponent implements OnInit {
   itemsSnapshot = signal<any[]>([]);
 
   totalBuy = computed(() => {
+    const peg = this.nakitBaglamaDetail();
+    if (peg) {
+      return {
+        hasGram: peg.equivalentHasGram,
+        cash: peg.cash,
+      };
+    }
     const items = this.itemsSnapshot();
     let has = 0, cash = 0;
     for (const it of items) {
@@ -92,6 +107,9 @@ export class TransactionFormComponent implements OnInit {
   });
 
   totalSell = computed(() => {
+    if (this.nakitBaglamaDetail()) {
+      return { hasGram: 0, cash: 0 };
+    }
     const items = this.itemsSnapshot();
     let has = 0, cash = 0;
     for (const it of items) {
@@ -104,6 +122,13 @@ export class TransactionFormComponent implements OnInit {
   });
 
   netResult = computed(() => {
+    const peg = this.nakitBaglamaDetail();
+    if (peg) {
+      return {
+        hasGram: peg.equivalentHasGram,
+        cash: Math.round(-peg.cash * 1000) / 1000,
+      };
+    }
     const buy = this.totalBuy();
     const sell = this.totalSell();
     return {
@@ -112,6 +137,9 @@ export class TransactionFormComponent implements OnInit {
     };
   });
 
+  /** TL gösterimi: nakit bağlama özetinde daha fazla ondalık. */
+  summaryCashDigits = computed(() => (this.nakitBaglamaDetail() ? '1.2-3' : '1.0-0'));
+
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
@@ -119,12 +147,25 @@ export class TransactionFormComponent implements OnInit {
       this.transactionId.set(id);
       this.transactionsApi.getById(id).subscribe({
         next: (tx) => {
+          this.headerForm.enable({ emitEvent: false });
+          this.nakitBaglamaDetail.set(null);
+
           this.headerForm.patchValue({
             transactionDate: new Date(tx.transactionDate).toISOString().slice(0, 10),
             description: tx.description ?? '',
             customerId: tx.customerId ?? null,
           });
+
           this.itemsArray.clear();
+
+          if (this.isNakitBaglamaTransaction(tx)) {
+            const detail = this.buildNakitBaglamaDetail(tx);
+            this.nakitBaglamaDetail.set(detail);
+            this.headerForm.disable({ emitEvent: false });
+            this.syncSnapshot();
+            return;
+          }
+
           for (const item of tx.items) {
             this.addItem(item.direction, item.quantity, item.milyem,
               item.pieceCount ?? 0, item.unitLabour ?? 0,
@@ -213,8 +254,49 @@ export class TransactionFormComponent implements OnInit {
     return isNaN(num) ? 0 : num;
   }
 
+  isNakitBaglamaTransaction(tx: Transaction): boolean {
+    return !!tx.correlationId && (!tx.items || tx.items.length === 0);
+  }
+
+  /**
+   * İşlem kaydındaki CashAmount / EquivalentHasGram öncelikli;
+   * birim has fiyatı işlemde saklanmadığı için cash / has ile türetilir (bağlama anındaki TL/gr).
+   */
+  private buildNakitBaglamaDetail(tx: Transaction): {
+    cash: number;
+    equivalentHasGram: number;
+    goldPricePerGram: number;
+  } {
+    const fromCash = tx.cashAmount != null && tx.cashAmount !== undefined
+      ? Math.abs(Number(tx.cashAmount))
+      : null;
+    const cash =
+      fromCash != null && !Number.isNaN(fromCash) && fromCash > 1e-9
+        ? fromCash
+        : Math.abs(Number(tx.netCashAmount ?? 0)) > 1e-9
+          ? Math.abs(Number(tx.netCashAmount))
+          : Math.abs(Number(tx.price ?? 0));
+
+    const fromEq = tx.equivalentHasGram != null && tx.equivalentHasGram !== undefined
+      ? Math.abs(Number(tx.equivalentHasGram))
+      : null;
+    const equivalentHasGram =
+      fromEq != null && !Number.isNaN(fromEq) && fromEq > 1e-9
+        ? fromEq
+        : Math.abs(Number(tx.netHasGram ?? tx.hasGram ?? 0));
+
+    const goldPricePerGram =
+      equivalentHasGram > 1e-9 ? Math.round((cash / equivalentHasGram) * 1e6) / 1e6 : 0;
+
+    return {
+      cash: Math.round(cash * 1000) / 1000,
+      equivalentHasGram: Math.round(equivalentHasGram * 1e6) / 1e6,
+      goldPricePerGram,
+    };
+  }
+
   onSubmit(): void {
-    if (this.itemsArray.length === 0 || this.saving()) return;
+    if (this.nakitBaglamaDetail() || this.itemsArray.length === 0 || this.saving()) return;
 
     const header = this.headerForm.getRawValue();
     const items: BasketItemCreate[] = this.itemsArray.controls.map(c => {

@@ -26,6 +26,10 @@ export interface Transaction {
   netCashAmount: number;
   hasGram: number;
   price?: number;
+  /** Nakit bağlama: bağlanan TL (pozitif tutar, API). */
+  cashAmount?: number | null;
+  /** Nakit bağlama: karşılık has gr (API). */
+  equivalentHasGram?: number | null;
   description?: string;
   customerId?: string;
   customerName?: string;

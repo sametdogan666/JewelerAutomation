@@ -31,7 +31,7 @@ public class SafeController : ControllerBase
     [HttpGet("balance")]
     public async Task<ActionResult<decimal>> GetBalance(CancellationToken cancellationToken)
     {
-        var balance = await _unitOfWork.SafeMovements.GetTotalHasGramBalanceAsync(cancellationToken).ConfigureAwait(false);
+        var balance = await _ledger.GetSafeGoldBalanceAsync(cancellationToken).ConfigureAwait(false);
         return Ok(balance);
     }
 

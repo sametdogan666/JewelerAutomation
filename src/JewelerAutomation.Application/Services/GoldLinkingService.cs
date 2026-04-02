@@ -295,16 +295,99 @@ public class GoldLinkingService : IGoldLinkingService
 
     public async Task<IReadOnlyList<LinkingProcessListItemDto>> GetLinkingHistoryAsync(CancellationToken cancellationToken = default)
     {
-        var list = await _linkingProcesses.GetAllOrderedAsync(cancellationToken).ConfigureAwait(false);
-        return list.Select(p => new LinkingProcessListItemDto(
+        var fifo = await _linkingProcesses.GetAllOrderedAsync(cancellationToken).ConfigureAwait(false);
+        var fifoDtos = fifo.Select(p => new LinkingProcessListItemDto(
             p.Id,
             p.LinkingDate,
             p.TargetAmount,
             p.TargetPrice,
             p.TotalProfit,
             p.SafeMovementId,
-            p.Notes
-        )).ToList();
+            p.Notes)).ToList();
+
+        var hybridLogs = await _unitOfWork.CashPeggingLogs.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var hybridDtos = new List<LinkingProcessListItemDto>();
+        foreach (var log in hybridLogs)
+        {
+            var txs = await _unitOfWork.Transactions.FindByCorrelationIdAsync(log.CorrelationId, cancellationToken)
+                .ConfigureAwait(false);
+            var header = txs.FirstOrDefault(t => !t.Items.Any() && t.CashAmount.HasValue);
+            if (header == null)
+                continue;
+
+            var profitTl = Math.Round(log.NetProfitHasGram * log.GoldPricePerGram, 4);
+            hybridDtos.Add(new LinkingProcessListItemDto(
+                Id: header.Id,
+                LinkingDate: log.PeggingDate,
+                TargetAmount: log.EquivalentHasGram,
+                TargetPrice: log.GoldPricePerGram,
+                TotalProfit: profitTl,
+                SafeMovementId: null,
+                Notes: log.Notes,
+                Kind: "Hybrid",
+                PeriodStartDate: log.PeriodStartDate,
+                PeriodEndDate: log.PeriodEndDate,
+                CashAmount: log.CashAmount,
+                NetProfitHasGram: log.NetProfitHasGram));
+        }
+
+        return fifoDtos.Concat(hybridDtos)
+            .OrderByDescending(x => x.LinkingDate)
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<(Guid GoldTransactionId, decimal AmountDeducted)>> ConsumeFifoForHybridPeggingAsync(
+        DateTime periodStart,
+        DateTime periodEnd,
+        decimal targetGram,
+        CancellationToken cancellationToken = default)
+    {
+        if (targetGram <= 0.0000001m)
+            return Array.Empty<(Guid, decimal)>();
+
+        var queue = await GetFifoQueueAsync(periodStart, periodEnd, cancellationToken).ConfigureAwait(false);
+        var remaining = targetGram;
+        var details = new List<(Guid GoldTransactionId, decimal AmountDeducted)>();
+
+        foreach (var gt in queue)
+        {
+            if (remaining <= 0) break;
+            var take = Math.Min(remaining, gt.RemainingGram);
+            if (take <= 0) continue;
+
+            gt.RemainingGram = Math.Round(gt.RemainingGram - take, 4);
+            if (gt.RemainingGram <= 0.0001m)
+            {
+                gt.RemainingGram = 0;
+                gt.IsFullyLinked = true;
+            }
+            else
+                gt.IsFullyLinked = false;
+
+            _goldTransactions.Update(gt);
+            details.Add((gt.Id, take));
+            remaining -= take;
+        }
+
+        return details;
+    }
+
+    public async Task RestoreHybridPeggingConsumptionsAsync(
+        IEnumerable<(Guid GoldTransactionId, decimal AmountDeducted)> details,
+        CancellationToken cancellationToken = default)
+    {
+        foreach (var (goldTxId, amt) in details)
+        {
+            var gt = await _goldTransactions.GetByIdAsync(goldTxId, cancellationToken).ConfigureAwait(false);
+            if (gt == null) continue;
+
+            gt.RemainingGram = Math.Round(gt.RemainingGram + amt, 4);
+            if (gt.RemainingGram > gt.OriginalHasGram)
+                gt.RemainingGram = gt.OriginalHasGram;
+
+            gt.IsFullyLinked = gt.RemainingGram <= 0.0001m;
+            _goldTransactions.Update(gt);
+        }
     }
 
     private async Task<IReadOnlyList<GoldTransaction>> GetFifoQueueAsync(

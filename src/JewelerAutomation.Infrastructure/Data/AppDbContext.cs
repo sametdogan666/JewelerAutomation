@@ -22,6 +22,7 @@ public class AppDbContext : DbContext
     public DbSet<GoldTransaction> GoldTransactions => Set<GoldTransaction>();
     public DbSet<LinkingProcess> LinkingProcesses => Set<LinkingProcess>();
     public DbSet<LinkingDetail> LinkingDetails => Set<LinkingDetail>();
+    public DbSet<CashPeggingFifoDetail> CashPeggingFifoDetails => Set<CashPeggingFifoDetail>();
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -169,6 +170,8 @@ public class AppDbContext : DbContext
             e.Property(x => x.UnitLabour).HasPrecision(precision, scale);
             e.Property(x => x.NetHasGram).HasPrecision(precision, scale);
             e.Property(x => x.NetCashAmount).HasPrecision(precision, scale);
+            e.Property(x => x.CashAmount).HasPrecision(precision, scale);
+            e.Property(x => x.EquivalentHasGram).HasPrecision(precision, scale);
             e.HasIndex(x => x.CorrelationId);
         });
 
@@ -265,6 +268,17 @@ public class AppDbContext : DbContext
             e.HasOne(x => x.LinkingProcess).WithMany(x => x.Details).HasForeignKey(x => x.LinkingProcessId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.GoldTransaction).WithMany().HasForeignKey(x => x.GoldTransactionId).OnDelete(DeleteBehavior.Restrict);
             e.Property(x => x.AmountDeducted).HasPrecision(linkPrecision, linkScale);
+        });
+
+        modelBuilder.Entity<CashPeggingFifoDetail>(e =>
+        {
+            e.HasOne(x => x.CashPeggingLog).WithMany(x => x.FifoDetails).HasForeignKey(x => x.CashPeggingLogId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.GoldTransaction).WithMany().HasForeignKey(x => x.GoldTransactionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.AmountDeducted).HasPrecision(linkPrecision, linkScale);
+            e.HasIndex(x => x.CashPeggingLogId);
+            e.HasIndex(x => x.GoldTransactionId);
         });
     }
 

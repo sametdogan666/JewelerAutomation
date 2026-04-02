@@ -22,6 +22,13 @@ public class PeggingService : IPeggingService
         _goldLinking = goldLinking;
     }
 
+    /// <summary>Dönem nakit bağlama başlığı: sepet kalemi yok, nakit/has alanları dolu.</summary>
+    private static bool IsHybridPeggingTransaction(Transaction tx) =>
+        tx.CorrelationId.HasValue
+        && !tx.Items.Any()
+        && tx.CashAmount.HasValue
+        && tx.EquivalentHasGram.HasValue;
+
     public async Task<SafeStatus> ComputeDashboardSafeStatusAsync(CancellationToken cancellationToken = default)
     {
         var balances = await _ledger.GetBalancesAsync(cancellationToken).ConfigureAwait(false);
@@ -49,6 +56,9 @@ public class PeggingService : IPeggingService
         decimal tradingPurchases = 0, tradingSales = 0;
         foreach (var tx in transactions)
         {
+            if (IsHybridPeggingTransaction(tx))
+                continue;
+
             if (tx.Items.Any())
             {
                 foreach (var item in tx.Items)
@@ -68,8 +78,12 @@ public class PeggingService : IPeggingService
             }
         }
 
+        var openUnpeggedSalesGram = await _goldLinking
+            .GetOpenHasPositionAsync(null, null, cancellationToken)
+            .ConfigureAwait(false);
+
         var expectedGold = capitalGold + tradingPurchases - tradingSales;
-        var goldGapOrSurplus = tradingPurchases - tradingSales;
+        var goldGapOrSurplus = Math.Round(-openUnpeggedSalesGram, 6);
 
         var customers = await _unitOfWork.Customers.GetAllAsync(cancellationToken).ConfigureAwait(false);
 

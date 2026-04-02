@@ -16,6 +16,9 @@ public interface ICashPeggingService
 
     Task DeletePeggingAsync(Guid peggingId, CancellationToken cancellationToken = default);
 
+    /// <summary>İşlemlerden nakit bağlama silinmeden önce: FIFO satış pozisyonunu geri yükler.</summary>
+    Task RestoreHybridPeggingFifoAsync(Guid correlationId, CancellationToken cancellationToken = default);
+
     Task<CashPeggingLog> UpdatePeggingAsync(
         Guid peggingId,
         decimal newGoldPricePerGram,

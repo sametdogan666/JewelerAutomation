@@ -50,6 +50,16 @@ public class Transaction : BaseEntity
     public decimal NetCashAmount { get; set; }
 
     /// <summary>
+    /// Nakit bağlama işleminde bağlanan toplam nakit (TL), pozitif tutar. Diğer kayıtlarda null.
+    /// </summary>
+    public decimal? CashAmount { get; set; }
+
+    /// <summary>
+    /// Nakit bağlama işleminde elde edilen has gram karşılığı, pozitif. Diğer kayıtlarda null.
+    /// </summary>
+    public decimal? EquivalentHasGram { get; set; }
+
+    /// <summary>
     /// Sepetteki kalemler (master-detail).
     /// </summary>
     public ICollection<TransactionItem> Items { get; set; } = new List<TransactionItem>();

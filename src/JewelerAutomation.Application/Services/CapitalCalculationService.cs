@@ -12,14 +12,18 @@ namespace JewelerAutomation.Application.Services;
 public class CapitalCalculationService : ICapitalCalculationService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ILedgerService _ledger;
 
-    public CapitalCalculationService(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
+    public CapitalCalculationService(IUnitOfWork unitOfWork, ILedgerService ledger)
+    {
+        _unitOfWork = unitOfWork;
+        _ledger = ledger;
+    }
 
     public async Task<CapitalSummary> GetCapitalSummaryAsync(CancellationToken cancellationToken = default)
     {
-        // 1. Kasadaki altın (Safe movements toplamı)
-        var safeMovements = await _unitOfWork.SafeMovements.GetAllAsync(cancellationToken);
-        var totalGoldInSafe = safeMovements.Sum(m => m.HasGram);
+        // 1. Kasadaki altın — defter (ledger) ile panel "Brüt Kasa" aynı kaynak; kâr gerçekleştirme kasa satırı ledger'a yazılmaz.
+        var totalGoldInSafe = await _ledger.GetSafeGoldBalanceAsync(cancellationToken).ConfigureAwait(false);
 
         // 2. Kasadaki nakit (şu an yok; ileride SafeMovement'ta CashAmount eklenirse kullanılır)
         // Şimdilik 0 döndürüyoruz

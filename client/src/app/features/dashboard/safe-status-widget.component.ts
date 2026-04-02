@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, signal, computed } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { DecimalPipe, NgClass } from '@angular/common';
@@ -55,7 +55,7 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
                 <div class="metric" [ngClass]="gapClass()">
                   <div class="metric-icon gap"><mat-icon>{{ gapIcon() }}</mat-icon></div>
                   <div class="metric-body">
-                    <span class="metric-label">Alış-Satış Pozisyonu</span>
+                    <span class="metric-label">Açık satış (FIFO)</span>
                     <span class="metric-value">{{ status()!.goldGapOrSurplus >= 0 ? '+' : '' }}{{ status()!.goldGapOrSurplus | number:'1.2-2' }} <small>Has Gr</small></span>
                     @if (status()!.goldGapOrSurplus > 0.001) {
                       <span class="metric-badge badge--surplus">
@@ -72,26 +72,28 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
             </div>
 
             <!-- ─── SECTION 2: Net Position (Finansal Durum) ─── -->
-            <div class="section">
+            <div class="section section--financial">
               <h3 class="section-title">
                 <mat-icon>account_balance</mat-icon>
                 Finansal Durum
                 <span class="section-hint">Kasa + Alacaklar − Borçlar</span>
               </h3>
 
-              <!-- Net Position highlight -->
-              <div class="net-position-card">
-                <div class="net-icon"><mat-icon>trending_up</mat-icon></div>
-                <div class="net-body">
-                  <span class="net-label">Net Altın</span>
-                  <span class="net-value">{{ status()!.netGoldPosition | number:'1.2-2' }} <small>Has Gr</small></span>
+              <!-- Net Position highlight — yan yana, kompakt -->
+              <div class="net-row">
+                <div class="net-position-card">
+                  <div class="net-icon"><mat-icon>trending_up</mat-icon></div>
+                  <div class="net-body">
+                    <span class="net-label">Net Altın</span>
+                    <span class="net-value">{{ status()!.netGoldPosition | number:'1.2-2' }} <small>Has Gr</small></span>
+                  </div>
                 </div>
-              </div>
-              <div class="net-position-card net-position-card--cash">
-                <div class="net-icon net-icon--cash"><mat-icon>payments</mat-icon></div>
-                <div class="net-body">
-                  <span class="net-label">Net Nakit</span>
-                  <span class="net-value">{{ status()!.netCashPosition | number:'1.0-0' }} <small>₺</small></span>
+                <div class="net-position-card net-position-card--cash">
+                  <div class="net-icon net-icon--cash"><mat-icon>payments</mat-icon></div>
+                  <div class="net-body">
+                    <span class="net-label">Net Nakit</span>
+                    <span class="net-value">{{ status()!.netCashPosition | number:'1.0-0' }} <small>₺</small></span>
+                  </div>
                 </div>
               </div>
 
@@ -182,26 +184,33 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
       box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
     }
 
+    :host ::ng-deep .mat-mdc-card-header {
+      padding: 0.75rem 1rem 0.25rem 1rem;
+    }
+    :host ::ng-deep .mat-mdc-card-content {
+      padding: 0.5rem 1rem 0.75rem 1rem !important;
+    }
+
     .widget-header {
       display: flex;
       align-items: center;
       gap: 0.75rem;
-      padding: 0.5rem 0;
+      padding: 0.15rem 0 0;
     }
     .widget-icon { font-size: 2rem; width: 2rem; height: 2rem; color: rgba(255,255,255,.9); }
     .widget-title { margin: 0; font-size: 1.5rem; font-weight: 600; color: white; }
     .widget-subtitle { margin: .25rem 0 0; font-size: .85rem; color: rgba(255,255,255,.7); }
 
-    .sections { display: flex; flex-direction: column; gap: 1.5rem; margin-top: 1rem; }
+    .sections { display: flex; flex-direction: column; gap: 0.85rem; margin-top: 0.35rem; }
 
     /* ── Section title ── */
     .section-title {
       display: flex; align-items: center; gap: .5rem;
-      margin: 0 0 .75rem; font-size: 1rem; font-weight: 600; color: rgba(255,255,255,.95);
-      mat-icon { font-size: 1.25rem; width: 1.25rem; height: 1.25rem; }
+      margin: 0 0 .5rem; font-size: 0.95rem; font-weight: 600; color: rgba(255,255,255,.95);
+      mat-icon { font-size: 1.15rem; width: 1.15rem; height: 1.15rem; }
     }
     .section-hint {
-      font-size: .75rem; font-weight: 400; color: rgba(255,255,255,.55);
+      font-size: .7rem; font-weight: 400; color: rgba(255,255,255,.55);
       margin-left: auto;
     }
 
@@ -209,11 +218,11 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
     .metric-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: .75rem;
+      gap: .5rem;
     }
     .metric {
       background: rgba(255,255,255,.12);
-      border-radius: 10px; padding: 1rem;
+      border-radius: 10px; padding: 0.65rem 0.75rem;
       display: flex; align-items: flex-start; gap: .75rem;
       border: 1px solid rgba(255,255,255,.15);
       transition: background .2s;
@@ -246,35 +255,42 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
     .metric--shortage { border-color: rgba(244,67,54,.5); }
     .metric--surplus  { border-color: rgba(76,175,80,.5); }
 
+    .net-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.45rem;
+      margin-bottom: 0.45rem;
+    }
+
     /* ── Net position card ── */
     .net-position-card {
       background: rgba(255,255,255,.18);
       border: 2px solid rgba(255,255,255,.25);
-      border-radius: 12px; padding: 1.25rem; margin-bottom: .75rem;
-      display: flex; align-items: center; gap: 1rem;
+      border-radius: 10px; padding: 0.55rem 0.65rem; margin-bottom: 0;
+      display: flex; align-items: center; gap: 0.55rem;
     }
     .net-position-card--cash {
       border-color: rgba(76,175,80,.4);
     }
     .net-icon {
-      width: 50px; height: 50px; border-radius: 10px;
+      width: 38px; height: 38px; border-radius: 8px;
       background: rgba(255,255,255,.2);
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      mat-icon { font-size: 1.75rem; width: 1.75rem; height: 1.75rem; color: white; }
+      mat-icon { font-size: 1.35rem; width: 1.35rem; height: 1.35rem; color: white; }
     }
     .net-icon--cash {
       background: rgba(76,175,80,.3);
     }
-    .net-body { flex: 1; display: flex; flex-direction: column; gap: .35rem; }
-    .net-label { font-size: .8rem; color: rgba(255,255,255,.8); text-transform: uppercase; letter-spacing: .8px; }
-    .net-value { font-size: 1.75rem; font-weight: 700; color: white; small { font-size: .9rem; color: rgba(255,255,255,.7); } }
+    .net-body { flex: 1; display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+    .net-label { font-size: .65rem; color: rgba(255,255,255,.75); text-transform: uppercase; letter-spacing: .5px; }
+    .net-value { font-size: 1.35rem; font-weight: 700; color: white; line-height: 1.15; small { font-size: .72rem; color: rgba(255,255,255,.7); } }
 
     /* ── Debt / Receivable grid ── */
     .debt-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;
+      display: grid; grid-template-columns: 1fr 1fr; gap: .4rem;
     }
     .debt-item {
-      background: rgba(255,255,255,.08); border-radius: 8px; padding: .75rem;
+      background: rgba(255,255,255,.08); border-radius: 8px; padding: .5rem .55rem;
       display: flex; align-items: center; gap: .6rem;
     }
     .debt-icon {
@@ -289,7 +305,7 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
     /* ── Profit strip ── */
     .profit-strip {
       display: flex; align-items: center; gap: .5rem;
-      margin-top: .75rem; padding: .6rem .75rem; border-radius: 8px;
+      margin-top: .45rem; padding: .45rem .55rem; border-radius: 8px;
       background: rgba(255,255,255,.1); font-size: .875rem;
       mat-icon { font-size: 1.25rem; width: 1.25rem; height: 1.25rem; }
     }
@@ -302,7 +318,7 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
     /* ── Performance section (Mali Analiz) ── */
     .performance-section {
       border-top: 1px solid rgba(255,255,255,.15);
-      padding-top: 1rem;
+      padding-top: 0.65rem;
     }
 
     .performance-card {
@@ -354,6 +370,7 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
       .metric-grid { grid-template-columns: 1fr; }
       .metric:last-child { grid-column: span 1; }
       .debt-grid { grid-template-columns: 1fr; }
+      .net-row { grid-template-columns: 1fr; }
     }
   `]
 })

@@ -114,10 +114,47 @@ export class TransactionsListComponent implements OnInit {
     this.dateFilterType.setValue('all');
   }
 
+  /** Nakit bağlama kaydı: CorrelationId + sepet kalemi yok (sistem işlemi). */
+  isNakitBaglamaRow(tx: Transaction): boolean {
+    return !!tx.correlationId && (!tx.items || tx.items.length === 0);
+  }
+
+  /**
+   * Nakit bağlama: kasadan çıkan net nakit (negatif TL), Transaction.CashAmount / NetCashAmount üzerinden.
+   */
+  peggingNetCashSigned(tx: Transaction): number {
+    const fromEntity =
+      tx.cashAmount != null && tx.cashAmount !== undefined
+        ? Number(tx.cashAmount)
+        : null;
+    const mag =
+      fromEntity != null && !Number.isNaN(fromEntity) && Math.abs(fromEntity) > 0.000001
+        ? Math.abs(fromEntity)
+        : Math.abs(Number(tx.netCashAmount ?? tx.price ?? 0));
+    return -mag;
+  }
+
+  /**
+   * Nakit bağlama: üretilen has gr (pozitif), Transaction.EquivalentHasGram öncelikli.
+   */
+  peggingEquivalentHasGram(tx: Transaction): number {
+    if (tx.equivalentHasGram != null && tx.equivalentHasGram !== undefined) {
+      return Math.abs(Number(tx.equivalentHasGram));
+    }
+    return Math.abs(Number(tx.netHasGram ?? tx.hasGram ?? 0));
+  }
+
   netLabel(tx: Transaction): string {
+    if (this.isNakitBaglamaRow(tx)) return 'Nakit Bağlama';
     if (tx.netHasGram > 0) return 'Alış (Net)';
     if (tx.netHasGram < 0) return 'Satış (Net)';
     return 'Dengeli';
+  }
+
+  itemCountLabel(tx: Transaction): string {
+    if (this.isNakitBaglamaRow(tx)) return '—';
+    const n = tx.items?.length ?? 0;
+    return n > 0 ? String(n) : '1';
   }
 
   formatDate(s: string): string {

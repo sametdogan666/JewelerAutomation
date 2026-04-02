@@ -28,6 +28,12 @@ export interface LinkingProcessListItem {
   totalProfit: number;
   safeMovementId?: string | null;
   notes?: string | null;
+  /** "Fifo" | "Hybrid" (dönem nakit bağlama) */
+  kind?: string;
+  periodStartDate?: string | null;
+  periodEndDate?: string | null;
+  cashAmount?: number | null;
+  netProfitHasGram?: number | null;
 }
 
 export interface LinkingProcessRequest {

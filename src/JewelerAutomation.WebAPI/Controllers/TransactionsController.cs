@@ -15,17 +15,20 @@ public class TransactionsController : ControllerBase
     private readonly IAccountingService _accounting;
     private readonly ILedgerService _ledger;
     private readonly IGoldLinkingService _goldLinking;
+    private readonly ICashPeggingService _cashPegging;
 
     public TransactionsController(
         IUnitOfWork unitOfWork,
         IAccountingService accounting,
         ILedgerService ledger,
-        IGoldLinkingService goldLinking)
+        IGoldLinkingService goldLinking,
+        ICashPeggingService cashPegging)
     {
         _unitOfWork = unitOfWork;
         _accounting = accounting;
         _ledger = ledger;
         _goldLinking = goldLinking;
+        _cashPegging = cashPegging;
     }
 
     [HttpGet]
@@ -329,6 +332,14 @@ public class TransactionsController : ControllerBase
         if (await _goldLinking.HasPartialLinkForTransactionAsync(id, cancellationToken).ConfigureAwait(false))
             return BadRequest("Bu işlemde kısmi FIFO nakit bağlantısı var; işlem silinemez.");
 
+        if (transaction.CorrelationId.HasValue
+            && !transaction.Items.Any()
+            && transaction.CashAmount.HasValue)
+        {
+            await _cashPegging.RestoreHybridPeggingFifoAsync(transaction.CorrelationId.Value, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         await _goldLinking.RemoveGoldTransactionsForTransactionAsync(id, cancellationToken).ConfigureAwait(false);
 
         // Find SafeMovements by SourceTransactionId
@@ -372,6 +383,8 @@ public class TransactionsController : ControllerBase
             NetCashAmount: tx.NetCashAmount,
             HasGram: tx.HasGram,
             Price: tx.Price,
+            CashAmount: tx.CashAmount,
+            EquivalentHasGram: tx.EquivalentHasGram,
             Description: tx.Description,
             CustomerId: tx.CustomerId,
             CustomerName: tx.Customer?.Name,
@@ -421,6 +434,8 @@ public record TransactionDto(
     decimal NetCashAmount,
     decimal HasGram,
     decimal? Price,
+    decimal? CashAmount,
+    decimal? EquivalentHasGram,
     string? Description,
     Guid? CustomerId,
     string? CustomerName,

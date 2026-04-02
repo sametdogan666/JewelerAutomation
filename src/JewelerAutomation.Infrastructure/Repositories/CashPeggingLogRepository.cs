@@ -37,9 +37,17 @@ public class CashPeggingLogRepository : ICashPeggingLogRepository
             .OrderByDescending(x => x.PeggingDate)
             .FirstOrDefaultAsync(cancellationToken);
 
+    public async Task<CashPeggingLog?> GetByCorrelationIdWithFifoDetailsAsync(Guid correlationId, CancellationToken cancellationToken = default)
+        => await _context.CashPeggingLogs
+            .Include(x => x.FifoDetails)
+            .FirstOrDefaultAsync(x => x.CorrelationId == correlationId, cancellationToken);
+
     public void Update(CashPeggingLog entity)
         => _context.CashPeggingLogs.Update(entity);
 
     public void Delete(CashPeggingLog entity)
         => _context.CashPeggingLogs.Remove(entity);
+
+    public void RemoveFifoDetails(IEnumerable<CashPeggingFifoDetail> details)
+        => _context.CashPeggingFifoDetails.RemoveRange(details);
 }

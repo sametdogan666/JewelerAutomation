@@ -3,6 +3,7 @@ using System;
 using JewelerAutomation.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace JewelerAutomation.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260402192850_AddTransactionCashAmountEquivalentHasGram")]
+    partial class AddTransactionCashAmountEquivalentHasGram
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,43 +24,6 @@ namespace JewelerAutomation.Infrastructure.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("JewelerAutomation.Core.Entities.CashPeggingFifoDetail", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("AmountDeducted")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<Guid>("CashPeggingLogId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("GoldTransactionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CashPeggingLogId");
-
-                    b.HasIndex("GoldTransactionId");
-
-                    b.ToTable("CashPeggingFifoDetails");
-                });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.CashPeggingLog", b =>
                 {
@@ -844,25 +810,6 @@ namespace JewelerAutomation.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("JewelerAutomation.Core.Entities.CashPeggingFifoDetail", b =>
-                {
-                    b.HasOne("JewelerAutomation.Core.Entities.CashPeggingLog", "CashPeggingLog")
-                        .WithMany("FifoDetails")
-                        .HasForeignKey("CashPeggingLogId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("JewelerAutomation.Core.Entities.GoldTransaction", "GoldTransaction")
-                        .WithMany()
-                        .HasForeignKey("GoldTransactionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("CashPeggingLog");
-
-                    b.Navigation("GoldTransaction");
-                });
-
             modelBuilder.Entity("JewelerAutomation.Core.Entities.CashToGoldConversion", b =>
                 {
                     b.HasOne("JewelerAutomation.Core.Entities.Customer", "Customer")
@@ -971,11 +918,6 @@ namespace JewelerAutomation.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Transaction");
-                });
-
-            modelBuilder.Entity("JewelerAutomation.Core.Entities.CashPeggingLog", b =>
-                {
-                    b.Navigation("FifoDetails");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.Customer", b =>

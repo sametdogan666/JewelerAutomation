@@ -2,12 +2,9 @@ import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
-import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { Subscription } from 'rxjs';
 import { CapitalService, CapitalSummary } from '../../core/services/capital.service';
 import { DashboardRefreshService } from '../../core/services/dashboard-refresh.service';
-import { ProfitAnalysisDialogComponent } from '../profit-analysis/profit-analysis-dialog.component';
 
 @Component({
   selector: 'app-profit-widget',
@@ -16,8 +13,6 @@ import { ProfitAnalysisDialogComponent } from '../profit-analysis/profit-analysi
     CommonModule,
     MatCardModule,
     MatIconModule,
-    MatButtonModule,
-    MatDialogModule
   ],
   template: `
     <mat-card class="profit-card">
@@ -26,7 +21,7 @@ import { ProfitAnalysisDialogComponent } from '../profit-analysis/profit-analysi
           <mat-icon class="widget-icon">analytics</mat-icon>
           <div>
             <h2 class="widget-title">Sermaye Özeti</h2>
-            <p class="widget-subtitle">Anlık sermaye ve nakit durumu</p>
+            <p class="widget-subtitle">Anlık sermaye · Nakit bağlama: üstteki Hızlı Erişim</p>
           </div>
         </div>
       </mat-card-header>
@@ -84,14 +79,6 @@ import { ProfitAnalysisDialogComponent } from '../profit-analysis/profit-analysi
                 </div>
               </div>
             </div>
-
-            <!-- Detaylı Analiz Butonu -->
-            <div class="widget-actions">
-              <button mat-raised-button color="accent" (click)="openProfitAnalysisDialog()" type="button" class="analysis-button">
-                <mat-icon>analytics</mat-icon>
-                Nakit Bağlama ve Dönemsel Analiz
-              </button>
-            </div>
           </div>
         } @else {
           <div class="empty-state">
@@ -113,23 +100,30 @@ import { ProfitAnalysisDialogComponent } from '../profit-analysis/profit-analysi
       flex-direction: column;
     }
 
+    :host ::ng-deep .mat-mdc-card-header {
+      padding: 0.75rem 1rem 0.25rem 1rem;
+    }
+    :host ::ng-deep .mat-mdc-card-content {
+      padding: 0.5rem 1rem 0.85rem 1rem !important;
+    }
+
     .widget-header {
       display: flex;
       align-items: center;
-      gap: 1rem;
-      padding: 0.5rem 0;
+      gap: 0.75rem;
+      padding: 0.15rem 0 0;
     }
 
     .widget-icon {
-      font-size: 2.5rem;
-      width: 2.5rem;
-      height: 2.5rem;
+      font-size: 2rem;
+      width: 2rem;
+      height: 2rem;
       color: rgba(255, 255, 255, 0.9);
     }
 
     .widget-title {
       margin: 0;
-      font-size: 1.5rem;
+      font-size: 1.25rem;
       font-weight: 600;
       color: white;
     }
@@ -173,20 +167,20 @@ import { ProfitAnalysisDialogComponent } from '../profit-analysis/profit-analysi
     .profit-display {
       display: flex;
       flex-direction: column;
-      gap: 1.5rem;
+      gap: 0.75rem;
       flex: 1;
     }
 
     .details-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
+      gap: 0.65rem;
     }
 
     .detail-card {
       background: rgba(255, 255, 255, 0.1);
       border-radius: 8px;
-      padding: 1rem;
+      padding: 0.7rem 0.85rem;
       display: flex;
       align-items: flex-start;
       gap: 1rem;
@@ -281,30 +275,6 @@ import { ProfitAnalysisDialogComponent } from '../profit-analysis/profit-analysi
       opacity: 0.5;
     }
 
-    .widget-actions {
-      margin-top: auto;
-      padding-top: 1.5rem;
-      display: flex;
-      justify-content: center;
-    }
-
-    .analysis-button {
-      width: 100%;
-      padding: 0.875rem 1.5rem;
-      font-weight: 600;
-      font-size: 0.95rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-
-      mat-icon {
-        font-size: 1.25rem;
-        width: 1.25rem;
-        height: 1.25rem;
-      }
-    }
-
     @media (max-width: 768px) {
       .details-grid {
         grid-template-columns: 1fr;
@@ -318,7 +288,6 @@ import { ProfitAnalysisDialogComponent } from '../profit-analysis/profit-analysi
 })
 export class ProfitWidgetComponent implements OnInit, OnDestroy {
   private capitalService = inject(CapitalService);
-  private dialog = inject(MatDialog);
   private refreshService = inject(DashboardRefreshService);
   private refreshSub?: Subscription;
 
@@ -347,20 +316,4 @@ export class ProfitWidgetComponent implements OnInit, OnDestroy {
     });
   }
 
-  openProfitAnalysisDialog(): void {
-    const dialogRef = this.dialog.open(ProfitAnalysisDialogComponent, {
-      width: '1100px',
-      maxWidth: '95vw',
-      height: 'auto',
-      maxHeight: '90vh',
-      disableClose: false,
-      panelClass: 'profit-analysis-dialog'
-    });
-
-    dialogRef.afterClosed().subscribe((result) => {
-      if (result) {
-        this.loadData();
-      }
-    });
-  }
 }

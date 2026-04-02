@@ -27,7 +27,12 @@ public record LinkingProcessListItemDto(
     decimal TargetPrice,
     decimal TotalProfit,
     Guid? SafeMovementId,
-    string? Notes
+    string? Notes,
+    string Kind = "Fifo",
+    DateTime? PeriodStartDate = null,
+    DateTime? PeriodEndDate = null,
+    decimal? CashAmount = null,
+    decimal? NetProfitHasGram = null
 );
 
 public interface IGoldLinkingService
@@ -64,4 +69,16 @@ public interface IGoldLinkingService
     Task CancelLinkingAsync(Guid linkingProcessId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<LinkingProcessListItemDto>> GetLinkingHistoryAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Hibrit dönem nakit bağlama: dönemdeki açık FIFO satış pozisyonundan gram düşer (ledger üretmez).</summary>
+    Task<IReadOnlyList<(Guid GoldTransactionId, decimal AmountDeducted)>> ConsumeFifoForHybridPeggingAsync(
+        DateTime periodStart,
+        DateTime periodEnd,
+        decimal targetGram,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Hibrit bağlama iptalinde GoldTransaction kalan gram geri yüklenir.</summary>
+    Task RestoreHybridPeggingConsumptionsAsync(
+        IEnumerable<(Guid GoldTransactionId, decimal AmountDeducted)> details,
+        CancellationToken cancellationToken = default);
 }

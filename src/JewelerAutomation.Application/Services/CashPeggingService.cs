@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.Extensions.Logging;
 using JewelerAutomation.Application.Interfaces;
 using JewelerAutomation.Core.Entities;
@@ -9,17 +10,20 @@ public class CashPeggingService : ICashPeggingService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAccountingService _accounting;
     private readonly ILedgerService _ledger;
+    private readonly IGoldLinkingService _goldLinking;
     private readonly ILogger<CashPeggingService> _logger;
 
     public CashPeggingService(
         IUnitOfWork unitOfWork,
         IAccountingService accounting,
         ILedgerService ledger,
+        IGoldLinkingService goldLinking,
         ILogger<CashPeggingService> logger)
     {
         _unitOfWork = unitOfWork;
         _accounting = accounting;
         _ledger = ledger;
+        _goldLinking = goldLinking;
         _logger = logger;
     }
 
@@ -47,7 +51,7 @@ public class CashPeggingService : ICashPeggingService
         var equivalentHasGram = simulation.CashEquivalentHasGram;
         var peggingDate = DateTime.UtcNow;
         var correlationId = Guid.NewGuid();
-        var description = notes ?? $"Nakit Bağlama: {cashAmount:N2} TL → {equivalentHasGram:N6} Has Gr";
+        var description = BuildPeggingTransactionDescription(cashAmount, equivalentHasGram, goldPricePerGram, notes);
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
@@ -95,7 +99,9 @@ public class CashPeggingService : ICashPeggingService
                     CustomerId = null,
                     CorrelationId = correlationId,
                     NetHasGram = Math.Abs(equivalentHasGram),
-                    NetCashAmount = -Math.Abs(cashAmount)
+                    NetCashAmount = -Math.Abs(cashAmount),
+                    CashAmount = Math.Abs(cashAmount),
+                    EquivalentHasGram = Math.Abs(equivalentHasGram)
                 };
 
                 await _unitOfWork.Transactions.AddAsync(transaction, cancellationToken);
@@ -125,6 +131,17 @@ public class CashPeggingService : ICashPeggingService
                     correlationId: correlationId,
                     cancellationToken: cancellationToken
                 );
+
+                var fifoConsumed = await _goldLinking.ConsumeFifoForHybridPeggingAsync(
+                    periodStart, periodEnd, Math.Abs(equivalentHasGram), cancellationToken).ConfigureAwait(false);
+                foreach (var (goldTxId, amt) in fifoConsumed)
+                {
+                    log.FifoDetails.Add(new CashPeggingFifoDetail
+                    {
+                        GoldTransactionId = goldTxId,
+                        AmountDeducted = amt
+                    });
+                }
             }
 
             // ── Profit realization (reporting-only — NO ledger entry) ──
@@ -168,6 +185,21 @@ public class CashPeggingService : ICashPeggingService
         }
     }
 
+    public async Task RestoreHybridPeggingFifoAsync(Guid correlationId, CancellationToken cancellationToken = default)
+    {
+        var log = await _unitOfWork.CashPeggingLogs
+            .GetByCorrelationIdWithFifoDetailsAsync(correlationId, cancellationToken)
+            .ConfigureAwait(false);
+        if (log?.FifoDetails == null || log.FifoDetails.Count == 0)
+            return;
+
+        await _goldLinking.RestoreHybridPeggingConsumptionsAsync(
+            log.FifoDetails.Select(d => (d.GoldTransactionId, d.AmountDeducted)),
+            cancellationToken).ConfigureAwait(false);
+
+        _unitOfWork.CashPeggingLogs.RemoveFifoDetails(log.FifoDetails.ToList());
+    }
+
     public async Task DeletePeggingAsync(Guid peggingId, CancellationToken cancellationToken = default)
     {
         var log = await _unitOfWork.CashPeggingLogs.GetByIdAsync(peggingId, cancellationToken)
@@ -176,6 +208,8 @@ public class CashPeggingService : ICashPeggingService
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
         try
         {
+            await RestoreHybridPeggingFifoAsync(log.CorrelationId, cancellationToken).ConfigureAwait(false);
+
             _unitOfWork.CashPeggingLogs.Delete(log);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
@@ -206,7 +240,7 @@ public class CashPeggingService : ICashPeggingService
 
         var oldCash = log.CashAmount;
         var newEquivalentHasGram = oldCash != 0 ? Math.Round(oldCash / newGoldPricePerGram, 6) : 0;
-        var description = notes ?? $"Nakit Bağlama: {oldCash:N2} TL → {newEquivalentHasGram:N6} Has Gr";
+        var description = BuildPeggingTransactionDescription(oldCash, newEquivalentHasGram, newGoldPricePerGram, notes);
 
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
@@ -231,6 +265,8 @@ public class CashPeggingService : ICashPeggingService
                 tx.Price = Math.Abs(oldCash);
                 tx.NetHasGram = Math.Abs(newEquivalentHasGram);
                 tx.NetCashAmount = -Math.Abs(oldCash);
+                tx.CashAmount = Math.Abs(oldCash);
+                tx.EquivalentHasGram = Math.Abs(newEquivalentHasGram);
                 tx.Description = description;
                 _unitOfWork.Transactions.Update(tx);
             }
@@ -382,5 +418,19 @@ public class CashPeggingService : ICashPeggingService
             SafeCashBalance: safeCash,
             LedgerPeriodCashBalance: ledgerPeriodCash
         );
+    }
+
+    /// <summary>
+    /// İşlemler listesinde net kolonları ve açıklama için tutarlı metin (fiyat TL/gr dahil).
+    /// </summary>
+    private static string BuildPeggingTransactionDescription(
+        decimal cashAmount,
+        decimal equivalentHasGram,
+        decimal goldPricePerGram,
+        string? notes)
+    {
+        var core =
+            $"Nakit Bağlama: {cashAmount:N2} TL → {equivalentHasGram:N4} Has Gr @ {goldPricePerGram:N2} TL/gr";
+        return string.IsNullOrWhiteSpace(notes) ? core : $"{core} · {notes.Trim()}";
     }
 }

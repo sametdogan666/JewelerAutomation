@@ -173,6 +173,75 @@
   &.row-purchase {
     border-left: 3px solid #2e7d32;
   }
+
+  &.grid-row--nakit-pegging {
+    background: linear-gradient(90deg, rgba(46, 125, 50, 0.06) 0%, transparent 100%);
+    align-items: start;
+    padding-top: 10px;
+    padding-bottom: 10px;
+
+    &:hover {
+      background: linear-gradient(90deg, rgba(46, 125, 50, 0.09) 0%, transparent 100%);
+    }
+
+    .pegging-cell {
+      align-self: center;
+    }
+  }
+}
+
+.nakit-pegging-badge {
+  margin-left: 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #2e7d32;
+  background: rgba(46, 125, 50, 0.12);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.pegging-type-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1b5e20;
+  padding: 0 4px;
+}
+
+.pegging-price-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-items: flex-start;
+  padding: 4px;
+
+  .pegging-unit-price {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+  }
+
+  .pegging-total-cash {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+}
+
+.pegging-desc-hint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  padding: 0 4px;
+}
+
+.pegging-lock-icon {
+  font-size: 1.125rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--text-muted);
+  opacity: 0.85;
 }
 
 .compact-field {

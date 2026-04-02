@@ -1,11 +1,17 @@
 .dashboard-page {
-  padding: var(--spacing-lg);
-  max-width: 1600px;
+  padding: var(--spacing-md) var(--spacing-lg);
+  max-width: none;
+  width: 100%;
   margin: 0 auto;
+  box-sizing: border-box;
+  min-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
 }
 
 .page-header {
-  margin-bottom: var(--spacing-xl);
+  margin-bottom: var(--spacing-md);
+  flex-shrink: 0;
 
   .page-title {
     margin: 0 0 0.35rem 0;
@@ -32,30 +38,83 @@
   }
 }
 
-.main-widgets-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.25rem;
+/* Dikey akış: üstte hızlı erişim, altta iki özet paneli eşit pay */
+.dashboard-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  flex: 1;
+  min-height: 0;
+}
 
-  @media (max-width: 1400px) {
+.summary-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+  flex: 1;
+  min-height: min(520px, calc(100vh - 280px));
+
+  .summary-panel {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+
+    ::ng-deep .safe-widget,
+    ::ng-deep .profit-card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+
+    ::ng-deep .mat-mdc-card-content {
+      flex: 1;
+    }
+  }
+
+  @media (max-width: 1100px) {
     grid-template-columns: 1fr;
-    gap: 1rem;
+    min-height: 0;
   }
 }
 
-// Quick Actions Widget (Mor tema)
+// Quick Actions — üst şerit, premium kompakt
 .quick-actions-widget {
   background: linear-gradient(135deg, #4a148c 0%, #7b1fa2 100%);
   color: white;
   border-radius: 16px;
   box-shadow: 0 8px 32px rgba(74, 20, 140, 0.3);
+  flex-shrink: 0;
+
+  &--top {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
 
   mat-card-header {
-    padding: 1.5rem 1.5rem 0 1.5rem;
+    padding: 0.75rem 1.25rem 0 1.25rem;
   }
 
   mat-card-content {
-    padding: 1.5rem !important;
+    padding: 0.65rem 1.25rem 1rem !important;
+  }
+
+  .quick-actions-header {
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .quick-actions-titles {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .widget-subhint {
+    margin: 0.2rem 0 0;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.65);
+    font-weight: 400;
+    line-height: 1.35;
   }
 
   .widget-header {
@@ -65,28 +124,24 @@
   }
 
   .widget-icon {
-    font-size: 2.5rem;
-    width: 2.5rem;
-    height: 2.5rem;
+    font-size: 2rem;
+    width: 2rem;
+    height: 2rem;
     color: rgba(255, 255, 255, 0.9);
   }
 
   .widget-title {
     margin: 0;
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     font-weight: 600;
     color: white;
   }
 
   .actions-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-    margin-top: 0.5rem;
-
-    @media (max-width: 600px) {
-      grid-template-columns: 1fr;
-    }
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: 0.6rem;
+    margin-top: 0.25rem;
   }
 
   .action-btn {
@@ -94,28 +149,41 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.75rem;
-    padding: 1.5rem 1rem;
+    gap: 0.4rem;
+    padding: 0.75rem 0.5rem;
     background: rgba(255, 255, 255, 0.15);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 12px;
     color: white;
     text-decoration: none;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
     font-weight: 500;
-    font-size: 0.9375rem;
+    font-size: 0.8rem;
+    line-height: 1.2;
+    text-align: center;
 
     mat-icon {
-      font-size: 2rem;
-      width: 2rem;
-      height: 2rem;
+      font-size: 1.65rem;
+      width: 1.65rem;
+      height: 1.65rem;
     }
 
     &:hover {
       background: rgba(255, 255, 255, 0.25);
-      transform: translateY(-4px);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    }
+
+    &--peg {
+      background: linear-gradient(135deg, rgba(255, 193, 7, 0.35) 0%, rgba(255, 152, 0, 0.45) 100%);
+      border: 2px solid rgba(255, 213, 79, 0.85);
+      font-weight: 700;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+
+      mat-icon {
+        color: #fffde7;
+      }
     }
 
     &--transaction {
