@@ -9,6 +9,10 @@ public class TransactionItem : BaseEntity
     public Guid TransactionId { get; set; }
     public Transaction? Transaction { get; set; }
 
+    /// <summary>İsteğe bağlı şablon referansı; eski kayıtlarda null.</summary>
+    public Guid? ProductTemplateId { get; set; }
+    public ProductTemplate? ProductTemplate { get; set; }
+
     public TransactionDirection Direction { get; set; }
 
     /// <summary> Gram (Miktar veya Ağırlık) - decimal(18,6) </summary>

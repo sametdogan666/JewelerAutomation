@@ -13,4 +13,5 @@ public interface ILedgerRepository : IRepository<LedgerEntry>
     Task<IEnumerable<LedgerEntry>> GetByPeriodAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
     Task<IEnumerable<LedgerEntry>> GetByCustomerAndPeriodAsync(Guid customerId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
     Task<int> CountAsync(CancellationToken cancellationToken = default);
+    Task<bool> AnyEntryForCustomerAsync(Guid customerId, CancellationToken cancellationToken = default);
 }

@@ -49,6 +49,12 @@ public class SafeMovementRepository : ISafeMovementRepository
             .Where(m => m.CorrelationId == correlationId)
             .ToListAsync(cancellationToken);
 
+    public async Task<bool> AnyVaultMovementForCustomerAsync(Guid customerId, CancellationToken cancellationToken = default)
+        => await _context.SafeMovements
+            .AnyAsync(m => m.SourceTransactionId != null
+                && _context.Transactions.Any(t => t.Id == m.SourceTransactionId && t.CustomerId == customerId),
+                cancellationToken);
+
     public void Update(Core.Entities.SafeMovement entity) => _context.SafeMovements.Update(entity);
 
     public void Delete(Core.Entities.SafeMovement entity) => _context.SafeMovements.Remove(entity);

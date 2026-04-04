@@ -1,3 +1,4 @@
+<!-- isLoading tam sayfayı sarmaz; mor kutular her zaman DOM'da (veri widget içinde computed). -->
 <div class="dashboard-page">
   <div class="page-header">
     <h1 class="page-title">
@@ -47,14 +48,23 @@
             <mat-icon>people</mat-icon>
             <span>Cariler ({{ customerCount() || 0 }})</span>
           </a>
+          <button
+            mat-stroked-button
+            type="button"
+            class="action-btn action-btn--rate"
+            matTooltip="Bugün için HAS kuru (canlı API yoksa)"
+            (click)="openManualGoldRate()">
+            <mat-icon>tune</mat-icon>
+            <span>Manuel Kur Ayarla</span>
+          </button>
         </div>
       </mat-card-content>
     </mat-card>
 
     <!-- Özet kartları: Finansal durum + sermaye — kalan yüksekliği paylaşır -->
     <div class="summary-charts-grid">
-      <app-safe-status-widget class="summary-panel"></app-safe-status-widget>
-      <app-profit-widget class="summary-panel"></app-profit-widget>
+      <app-safe-status-widget class="summary-panel" [dashboard]="dashboardData()" />
+      <app-profit-widget class="summary-panel" [dashboard]="dashboardData()" />
     </div>
   </div>
 </div>

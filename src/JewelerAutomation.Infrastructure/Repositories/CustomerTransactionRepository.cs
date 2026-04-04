@@ -86,4 +86,7 @@ public class CustomerTransactionRepository : ICustomerTransactionRepository
         }
         return (gold, cash);
     }
+
+    public async Task<bool> AnyForCustomerAsync(Guid customerId, CancellationToken cancellationToken = default)
+        => await _context.CustomerTransactions.AnyAsync(x => x.CustomerId == customerId, cancellationToken);
 }

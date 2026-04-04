@@ -39,4 +39,7 @@ public class CashToGoldConversionRepository : Repository<CashToGoldConversion>, 
     public async Task<decimal> GetTotalConvertedGoldAsync(CancellationToken cancellationToken = default)
         => await Context.CashToGoldConversions
             .SumAsync(c => c.ConvertedGoldHas, cancellationToken);
+
+    public async Task<bool> AnyForCustomerAsync(Guid customerId, CancellationToken cancellationToken = default)
+        => await Context.CashToGoldConversions.AnyAsync(c => c.CustomerId == customerId, cancellationToken);
 }

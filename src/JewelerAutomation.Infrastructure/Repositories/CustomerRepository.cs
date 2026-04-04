@@ -14,14 +14,21 @@ public class CustomerRepository : ICustomerRepository
     public async Task<Customer?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => await _context.Customers.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
 
-    public async Task<IReadOnlyList<Customer>> GetAllAsync(CancellationToken cancellationToken = default)
-        => await _context.Customers.OrderBy(c => c.Name).ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<Customer>> GetAllAsync(CancellationToken cancellationToken = default, bool includeInactive = true)
+    {
+        IQueryable<Customer> q = _context.Customers;
+        if (!includeInactive)
+            q = q.Where(c => c.IsActive);
+        return await q.OrderBy(c => c.Name).ToListAsync(cancellationToken);
+    }
 
-    public async Task<IReadOnlyList<Customer>> GetByTypeAsync(CustomerType type, CancellationToken cancellationToken = default)
-        => await _context.Customers
-            .Where(c => c.Type == type)
-            .OrderBy(c => c.Name)
-            .ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<Customer>> GetByTypeAsync(CustomerType type, CancellationToken cancellationToken = default, bool includeInactive = true)
+    {
+        IQueryable<Customer> q = _context.Customers.Where(c => c.Type == type);
+        if (!includeInactive)
+            q = q.Where(c => c.IsActive);
+        return await q.OrderBy(c => c.Name).ToListAsync(cancellationToken);
+    }
 
     public async Task<Customer> AddAsync(Customer entity, CancellationToken cancellationToken = default)
     {

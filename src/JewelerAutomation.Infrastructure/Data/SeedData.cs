@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using JewelerAutomation.Application.Services;
+using JewelerAutomation.Core;
 using JewelerAutomation.Core.Entities;
 
 namespace JewelerAutomation.Infrastructure.Data;
@@ -35,7 +36,7 @@ public static class SeedData
             UserName = "admin",
             NormalizedUserName = "ADMIN",
             PasswordHash = passwordHash,
-            Role = "Admin",
+            Role = AppRoles.Admin,
             IsActive = true
         };
         db.Users.Add(admin);

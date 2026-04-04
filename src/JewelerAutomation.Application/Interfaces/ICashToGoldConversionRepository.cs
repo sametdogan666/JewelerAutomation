@@ -7,4 +7,5 @@ public interface ICashToGoldConversionRepository : IRepository<CashToGoldConvers
     Task<IReadOnlyList<CashToGoldConversion>> GetByPeriodAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<CashToGoldConversion>> GetByCustomerAsync(Guid customerId, CancellationToken cancellationToken = default);
     Task<decimal> GetTotalConvertedGoldAsync(CancellationToken cancellationToken = default);
+    Task<bool> AnyForCustomerAsync(Guid customerId, CancellationToken cancellationToken = default);
 }

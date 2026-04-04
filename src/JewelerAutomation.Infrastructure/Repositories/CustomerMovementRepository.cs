@@ -21,6 +21,9 @@ public class CustomerMovementRepository : ICustomerMovementRepository
             .OrderBy(x => x.TransactionDate)
             .ToListAsync(cancellationToken);
 
+    public async Task<bool> AnyForCustomerAsync(Guid customerId, CancellationToken cancellationToken = default)
+        => await _context.CustomerMovements.AnyAsync(x => x.CustomerId == customerId, cancellationToken);
+
     /// <summary>
     /// Cari/Şahıs bakiye: SUM(HasGram) - Excel TOPLAM HESAP = SUM(G4:G500)
     /// </summary>

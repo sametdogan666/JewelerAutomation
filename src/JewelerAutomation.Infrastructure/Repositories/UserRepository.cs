@@ -14,6 +14,11 @@ public class UserRepository : IUserRepository
     public async Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         => await _context.Users.FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
 
+    public async Task<IReadOnlyList<User>> GetAllAsync(CancellationToken cancellationToken = default)
+        => await _context.Users
+            .OrderBy(u => u.UserName)
+            .ToListAsync(cancellationToken);
+
     public async Task<User?> GetByUserNameAsync(string normalizedUserName, CancellationToken cancellationToken = default)
         => await _context.Users.FirstOrDefaultAsync(u => u.NormalizedUserName == normalizedUserName, cancellationToken);
 

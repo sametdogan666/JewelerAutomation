@@ -151,6 +151,18 @@
             <button mat-icon-button type="button" (click)="toggleExpand(row)" matTooltip="Kalemleri göster">
               <mat-icon>{{ expandedRow() === row.id ? 'expand_less' : 'expand_more' }}</mat-icon>
             </button>
+            <button
+              mat-icon-button
+              type="button"
+              (click)="printReceipt(row)"
+              [disabled]="printing() === row.id"
+              matTooltip="Yazdır (80 mm fiş PDF)">
+              @if (printing() === row.id) {
+                <mat-icon>hourglass_empty</mat-icon>
+              } @else {
+                <mat-icon>receipt_long</mat-icon>
+              }
+            </button>
             <button mat-icon-button color="primary" [routerLink]="['/transactions', row.id, 'edit']" matTooltip="Düzenle" type="button">
               <mat-icon>edit</mat-icon>
             </button>

@@ -9,6 +9,7 @@ import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MAT_DATE_LOCALE } from '@angular/material/core';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
+import { httpErrorLogInterceptor } from './core/interceptors/http-error-log.interceptor';
 import { provideEnvironmentNgxMask } from 'ngx-mask';
 
 // Register Turkish locale for date formatting
@@ -18,7 +19,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    provideHttpClient(withInterceptors([authInterceptor])),
+    provideHttpClient(withInterceptors([authInterceptor, httpErrorLogInterceptor])),
     provideAnimationsAsync(),
     provideNativeDateAdapter(),
     importProvidersFrom(MatSnackBarModule),

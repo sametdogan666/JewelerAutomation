@@ -45,6 +45,9 @@ public class TransactionRepository : ITransactionRepository
             .Where(t => t.CorrelationId == correlationId)
             .ToListAsync(cancellationToken);
 
+    public async Task<bool> AnyByCustomerIdAsync(Guid customerId, CancellationToken cancellationToken = default)
+        => await _context.Transactions.AnyAsync(t => t.CustomerId == customerId, cancellationToken);
+
     public void Update(Transaction entity) => _context.Transactions.Update(entity);
 
     public void Delete(Transaction entity) => _context.Transactions.Remove(entity);

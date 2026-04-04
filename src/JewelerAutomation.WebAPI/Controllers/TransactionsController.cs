@@ -36,6 +36,44 @@ public class TransactionsController : ControllerBase
         _cashPegging = cashPegging;
     }
 
+    /// <summary>Alış: Has = gr×milyem (milyem≤1 ondalık; &gt;1 binlik×0,001); adet/işçilik yok. Satış: saf has + işçilik.</summary>
+    private ResolvedBasketItem ResolveBasketItem(BasketItemDto itemDto)
+    {
+        if (itemDto.Direction == TransactionDirection.Purchase)
+        {
+            var milyemLabour = _accounting.CalculateMilyemLabour(itemDto.Quantity, itemDto.Milyem);
+            var hasGram = _accounting.CalculateHasGram(itemDto.Quantity, itemDto.Milyem);
+            return new ResolvedBasketItem(null, null, 0m, hasGram, milyemLabour);
+        }
+
+        int rawPieces = itemDto.PieceCount ?? 0;
+        var labourPieces = rawPieces < 1 ? 1 : rawPieces;
+        decimal unitLabour = itemDto.UnitLabour ?? 0;
+        decimal totalLabour = _accounting.CalculateTotalLabour(labourPieces, unitLabour);
+        decimal hasGramSale = _accounting.CalculateHasGramWithLabour(itemDto.Quantity, itemDto.Milyem, totalLabour);
+        decimal milyemLabourSale = _accounting.CalculateMilyemLabour(itemDto.Quantity, itemDto.Milyem);
+        return new ResolvedBasketItem(itemDto.PieceCount, itemDto.UnitLabour, totalLabour, hasGramSale, milyemLabourSale);
+    }
+
+    /// <summary>Sepette gönderilen fiyat = Has başına TL; satır nakit = Has × birim fiyat.</summary>
+    private static decimal LineCashFromUnitPrice(decimal hasGram, decimal? unitPricePerHasGram) =>
+        Math.Round(hasGram * (unitPricePerHasGram ?? 0m), 6);
+
+    /// <summary>Önce doğrudan toplam TL (hesap makinesi); yoksa Has × birim fiyat.</summary>
+    private static decimal ResolveLineCash(decimal hasGram, decimal? unitPricePerHasGram, decimal? lineTotalTl)
+    {
+        if (lineTotalTl.HasValue)
+            return Math.Round(lineTotalTl.Value, 6);
+        return LineCashFromUnitPrice(hasGram, unitPricePerHasGram);
+    }
+
+    private sealed record ResolvedBasketItem(
+        int? PieceCount,
+        decimal? UnitLabour,
+        decimal TotalLabour,
+        decimal HasGram,
+        decimal MilyemLabour);
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<TransactionDto>>> GetAll(
         [FromQuery] DateTime? from,
@@ -91,12 +129,8 @@ public class TransactionsController : ControllerBase
 
         foreach (var itemDto in dto.Items)
         {
-            int rawPieces = itemDto.PieceCount ?? 0;
-            var labourPieces = rawPieces < 1 ? 1 : rawPieces;
-            decimal unitLabour = itemDto.UnitLabour ?? 0;
-            decimal totalLabour = _accounting.CalculateTotalLabour(labourPieces, unitLabour);
-            decimal hasGram = _accounting.CalculateHasGramWithLabour(itemDto.Quantity, itemDto.Milyem, totalLabour);
-            decimal milyemLabour = _accounting.CalculateMilyemLabour(itemDto.Quantity, itemDto.Milyem);
+            var r = ResolveBasketItem(itemDto);
+            var lineCash = ResolveLineCash(r.HasGram, itemDto.Price, itemDto.LineTotal);
 
             var item = new TransactionItem
             {
@@ -105,32 +139,33 @@ public class TransactionsController : ControllerBase
                 Direction = itemDto.Direction,
                 Quantity = itemDto.Quantity,
                 Milyem = itemDto.Milyem,
-                PieceCount = itemDto.PieceCount,
-                UnitLabour = itemDto.UnitLabour,
-                TotalLabour = totalLabour,
-                HasGram = hasGram,
-                Price = itemDto.Price,
+                PieceCount = r.PieceCount,
+                UnitLabour = r.UnitLabour,
+                TotalLabour = r.TotalLabour,
+                HasGram = r.HasGram,
+                Price = lineCash,
                 Description = itemDto.Description,
-                MilyemLabour = milyemLabour,
+                MilyemLabour = r.MilyemLabour,
+                ProductTemplateId = itemDto.ProductTemplateId,
             };
 
             transaction.Items.Add(item);
 
-            var itemCash = itemDto.Price ?? 0;
+            var itemCash = lineCash;
             if (itemDto.Direction == TransactionDirection.Purchase)
             {
-                totalBuyHas += hasGram;
+                totalBuyHas += r.HasGram;
                 totalBuyCash += itemCash;
             }
             else
             {
-                totalSellHas += hasGram;
+                totalSellHas += r.HasGram;
                 totalSellCash += itemCash;
             }
 
             // SafeMovement per item
             var kasaGram = itemDto.Direction == TransactionDirection.Sale ? -itemDto.Quantity : itemDto.Quantity;
-            var kasaHasGram = itemDto.Direction == TransactionDirection.Sale ? -hasGram : hasGram;
+            var kasaHasGram = itemDto.Direction == TransactionDirection.Sale ? -r.HasGram : r.HasGram;
             var safeMovement = new SafeMovement
             {
                 TransactionDate = dto.TransactionDate,
@@ -150,8 +185,8 @@ public class TransactionsController : ControllerBase
             await _ledger.RecordTransactionAsync(
                 transactionDate: dto.TransactionDate,
                 direction: itemDto.Direction,
-                goldHasAmount: hasGram,
-                cashAmount: itemDto.Price,
+                goldHasAmount: r.HasGram,
+                cashAmount: lineCash,
                 referenceId: transaction.Id,
                 customerId: dto.CustomerId,
                 description: itemDto.Description ?? dto.Description,
@@ -268,34 +303,27 @@ public class TransactionsController : ControllerBase
 
     private void ApplyDtoToTransactionItem(TransactionItem entity, BasketItemDto d)
     {
-        int rawPieces = d.PieceCount ?? 0;
-        var labourPieces = rawPieces < 1 ? 1 : rawPieces;
-        decimal unitLabour = d.UnitLabour ?? 0;
-        decimal totalLabour = _accounting.CalculateTotalLabour(labourPieces, unitLabour);
-        decimal hasGram = _accounting.CalculateHasGramWithLabour(d.Quantity, d.Milyem, totalLabour);
-        decimal milyemLabour = _accounting.CalculateMilyemLabour(d.Quantity, d.Milyem);
+        var r = ResolveBasketItem(d);
+        var lineCash = ResolveLineCash(r.HasGram, d.Price, d.LineTotal);
 
         entity.Direction = d.Direction;
         entity.Quantity = d.Quantity;
         entity.Milyem = d.Milyem;
-        entity.PieceCount = d.PieceCount;
-        entity.UnitLabour = d.UnitLabour;
-        entity.TotalLabour = totalLabour;
-        entity.HasGram = hasGram;
-        entity.Price = d.Price;
+        entity.PieceCount = r.PieceCount;
+        entity.UnitLabour = r.UnitLabour;
+        entity.TotalLabour = r.TotalLabour;
+        entity.HasGram = r.HasGram;
+        entity.Price = lineCash;
         entity.Description = d.Description;
-        entity.MilyemLabour = milyemLabour;
+        entity.MilyemLabour = r.MilyemLabour;
+        entity.ProductTemplateId = d.ProductTemplateId;
         entity.UpdatedAt = DateTime.UtcNow;
     }
 
     private TransactionItem CreateNewTransactionItemFromDto(BasketItemDto d, Guid transactionId)
     {
-        int rawPieces = d.PieceCount ?? 0;
-        var labourPieces = rawPieces < 1 ? 1 : rawPieces;
-        decimal unitLabour = d.UnitLabour ?? 0;
-        decimal totalLabour = _accounting.CalculateTotalLabour(labourPieces, unitLabour);
-        decimal hasGram = _accounting.CalculateHasGramWithLabour(d.Quantity, d.Milyem, totalLabour);
-        decimal milyemLabour = _accounting.CalculateMilyemLabour(d.Quantity, d.Milyem);
+        var r = ResolveBasketItem(d);
+        var lineCash = ResolveLineCash(r.HasGram, d.Price, d.LineTotal);
 
         return new TransactionItem
         {
@@ -304,13 +332,14 @@ public class TransactionsController : ControllerBase
             Direction = d.Direction,
             Quantity = d.Quantity,
             Milyem = d.Milyem,
-            PieceCount = d.PieceCount,
-            UnitLabour = d.UnitLabour,
-            TotalLabour = totalLabour,
-            HasGram = hasGram,
-            Price = d.Price,
+            PieceCount = r.PieceCount,
+            UnitLabour = r.UnitLabour,
+            TotalLabour = r.TotalLabour,
+            HasGram = r.HasGram,
+            Price = lineCash,
             Description = d.Description,
-            MilyemLabour = milyemLabour,
+            MilyemLabour = r.MilyemLabour,
+            ProductTemplateId = d.ProductTemplateId,
         };
     }
 
@@ -522,7 +551,8 @@ public class TransactionsController : ControllerBase
                 HasGram: i.HasGram,
                 Price: i.Price,
                 Description: i.Description,
-                MilyemLabour: i.MilyemLabour
+                MilyemLabour: i.MilyemLabour,
+                ProductTemplateId: i.ProductTemplateId
             )).ToList()
         );
     }
@@ -545,7 +575,9 @@ public record BasketItemDto(
     int? PieceCount,
     decimal? UnitLabour,
     decimal? Price,
-    string? Description
+    decimal? LineTotal,
+    string? Description,
+    Guid? ProductTemplateId
 );
 
 public record TransactionDto(
@@ -577,5 +609,6 @@ public record TransactionItemDto(
     decimal HasGram,
     decimal? Price,
     string? Description,
-    decimal MilyemLabour
+    decimal MilyemLabour,
+    Guid? ProductTemplateId
 );

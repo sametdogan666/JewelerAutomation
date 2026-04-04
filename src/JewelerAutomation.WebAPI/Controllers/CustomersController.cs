@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using JewelerAutomation.Application.Interfaces;
+using JewelerAutomation.Application.Services;
 using JewelerAutomation.Core.Entities;
 
 namespace JewelerAutomation.WebAPI.Controllers;
@@ -11,13 +12,21 @@ namespace JewelerAutomation.WebAPI.Controllers;
 public class CustomersController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICustomerService _customerService;
 
-    public CustomersController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
-
-    [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<Customer>>> GetAll(CancellationToken cancellationToken)
+    public CustomersController(IUnitOfWork unitOfWork, ICustomerService customerService)
     {
-        var list = await _unitOfWork.Customers.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        _unitOfWork = unitOfWork;
+        _customerService = customerService;
+    }
+
+    /// <summary>Aktif cariler (varsayılan). Raporlar için pasif dahil: ?includeInactive=true</summary>
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<Customer>>> GetAll(
+        [FromQuery] bool includeInactive = false,
+        CancellationToken cancellationToken = default)
+    {
+        var list = await _unitOfWork.Customers.GetAllAsync(cancellationToken, includeInactive).ConfigureAwait(false);
         return Ok(list);
     }
 
@@ -38,7 +47,8 @@ public class CustomersController : ControllerBase
             Phone = dto.Phone,
             Address = dto.Address,
             Type = dto.Type,
-            Description = dto.Description
+            Description = dto.Description,
+            IsActive = true
         };
         await _unitOfWork.Customers.AddAsync(entity, cancellationToken).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -62,13 +72,16 @@ public class CustomersController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
-    public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
-        var entity = await _unitOfWork.Customers.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
-        if (entity == null) return NotFound();
-        _unitOfWork.Customers.Remove(entity);
-        await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return NoContent();
+        var result = await _customerService.TryDeleteCustomerAsync(id, cancellationToken).ConfigureAwait(false);
+        return result switch
+        {
+            CustomerDeleteResult.NotFound => NotFound(),
+            CustomerDeleteResult.BlockedNonZeroBalance => BadRequest(CustomerService.NonZeroBalanceMessage),
+            CustomerDeleteResult.SoftDeleted or CustomerDeleteResult.HardDeleted => NoContent(),
+            _ => NoContent()
+        };
     }
 }
 

@@ -16,6 +16,7 @@ export interface TransactionItem {
   price?: number;
   description?: string;
   milyemLabour: number;
+  productTemplateId?: string | null;
 }
 
 export interface Transaction {
@@ -46,8 +47,12 @@ export interface BasketItemCreate {
   milyem: number;
   pieceCount?: number;
   unitLabour?: number;
+  /** Has başına TL; birim modunda kullanılır. */
   price?: number;
+  /** Doğrudan satır toplamı TL (hesap makinesi); gönderilirse API bunu nakit olarak alır. */
+  lineTotal?: number;
   description?: string;
+  productTemplateId?: string | null;
 }
 
 export interface BasketCreate {

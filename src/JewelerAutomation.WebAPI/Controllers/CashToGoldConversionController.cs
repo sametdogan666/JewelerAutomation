@@ -26,7 +26,7 @@ public class CashToGoldConversionController : ControllerBase
     [HttpGet("trading-partners")]
     public async Task<ActionResult<IReadOnlyList<TradingPartnerDto>>> GetTradingPartners(CancellationToken cancellationToken)
     {
-        var customers = await _unitOfWork.Customers.GetByTypeAsync(CustomerType.Cari, cancellationToken);
+        var customers = await _unitOfWork.Customers.GetByTypeAsync(CustomerType.Cari, cancellationToken, includeInactive: false);
         var dtos = customers.Select(c => new TradingPartnerDto(c.Id, c.Name)).ToList();
         return Ok(dtos);
     }

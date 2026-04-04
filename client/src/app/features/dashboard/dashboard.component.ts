@@ -1,4 +1,5 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { catchError, finalize, forkJoin, of, Subscription, timeout } from 'rxjs';
 import { RouterLink } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -6,10 +7,18 @@ import { DecimalPipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { CustomersService } from '../../core/services/customers.service';
+import { Customer, CustomersService } from '../../core/services/customers.service';
 import { DashboardRefreshService } from '../../core/services/dashboard-refresh.service';
+import {
+  createDefaultDashboardSummary,
+  DashboardService,
+  DashboardSummary,
+  normalizeDashboardSummary,
+} from '../../core/services/dashboard.service';
+import { GoldRatesSignalRService } from '../../core/services/gold-rates-signalr.service';
 import { SafeStatusWidgetComponent } from './safe-status-widget.component';
 import { ProfitWidgetComponent } from './profit-widget.component';
+import { ManualGoldRateDialogComponent } from './manual-gold-rate-dialog.component';
 import { ProfitAnalysisDialogComponent } from '../profit-analysis/profit-analysis-dialog.component';
 
 @Component({
@@ -29,19 +38,71 @@ import { ProfitAnalysisDialogComponent } from '../profit-analysis/profit-analysi
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   private customers = inject(CustomersService);
+  private dashboardService = inject(DashboardService);
   private dialog = inject(MatDialog);
   private refreshService = inject(DashboardRefreshService);
+  private goldHub = inject(GoldRatesSignalRService);
+
+  private refreshSub?: Subscription;
 
   customerCount = signal<number | null>(null);
-  loading = signal(true);
+  /** Panel özet verisi; başlangıçta varsayılan nesne — mor kutular hemen 0 ile render olur. */
+  dashboardData = signal<DashboardSummary>(createDefaultDashboardSummary());
+  /** Arka plan isteği için (tam sayfa spinner kullanılmıyor; yine de finalize + sert zaman ağı). */
+  isLoading = signal(false);
 
   ngOnInit(): void {
-    this.loading.set(true);
-    this.customers.getAll().subscribe({
-      next: (list) => { this.customerCount.set(list.length); this.loading.set(false); },
-      error: () => this.loading.set(false),
+    this.goldHub.start();
+    this.isLoading.set(true);
+    setTimeout(() => this.isLoading.set(false), 4000);
+    forkJoin({
+      summary: this.dashboardService
+        .getSummary()
+        .pipe(timeout(3000), catchError(() => of(null))),
+      customers: this.customers
+        .getAll()
+        .pipe(timeout(3000), catchError(() => of([] as Customer[]))),
+    })
+      .pipe(finalize(() => this.isLoading.set(false)))
+      .subscribe(({ summary, customers }) => {
+        const data = normalizeDashboardSummary(summary ?? undefined);
+        this.dashboardData.set(data);
+        this.customerCount.set(customers?.length ?? 0);
+      });
+
+    this.refreshSub = this.refreshService.refresh$.subscribe(() => this.loadDashboard());
+  }
+
+  ngOnDestroy(): void {
+    this.refreshSub?.unsubscribe();
+    this.goldHub.stop();
+  }
+
+  private loadDashboard(): void {
+    this.isLoading.set(true);
+    setTimeout(() => this.isLoading.set(false), 4000);
+    this.dashboardService
+      .getSummary()
+      .pipe(
+        timeout(3000),
+        catchError(() => of(null)),
+        finalize(() => this.isLoading.set(false)),
+      )
+      .subscribe((s) => {
+        const next =
+          s != null && typeof s === 'object'
+            ? normalizeDashboardSummary(s)
+            : normalizeDashboardSummary(this.dashboardData());
+        this.dashboardData.set(next);
+      });
+  }
+
+  openManualGoldRate(): void {
+    this.dialog.open(ManualGoldRateDialogComponent, { width: '420px', maxWidth: '95vw' }).afterClosed().subscribe((saved) => {
+      if (saved)
+        this.loadDashboard();
     });
   }
 

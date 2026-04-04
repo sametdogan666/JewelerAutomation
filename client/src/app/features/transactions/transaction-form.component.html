@@ -71,12 +71,14 @@
             <!-- Table Header -->
             <div class="grid-header">
               <div class="col-dir">Tür</div>
-              <div class="col-qty">Miktar (gr)</div>
+              <div class="col-tpl">Ürün şablonu</div>
+              <div class="col-qty">Gr</div>
               <div class="col-mil">Milyem</div>
               <div class="col-pc">Adet</div>
               <div class="col-ul">B. İşçilik</div>
-              <div class="col-price">Fiyat (₺)</div>
+              <div class="col-price">Has ₺/gr</div>
               <div class="col-has">Has Gr</div>
+              <div class="col-linetl">Toplam ₺</div>
               <div class="col-desc">Açıklama</div>
               <div class="col-act"></div>
             </div>
@@ -87,16 +89,19 @@
                 <div class="col-dir pegging-cell">
                   <span class="pegging-type-label">Nakit Bağlama</span>
                 </div>
+                <div class="col-tpl pegging-cell"><span class="cell-na">—</span></div>
                 <div class="col-qty pegging-cell"><span class="cell-na">—</span></div>
                 <div class="col-mil pegging-cell"><span class="cell-na">—</span></div>
                 <div class="col-pc pegging-cell"><span class="cell-na">—</span></div>
                 <div class="col-ul pegging-cell"><span class="cell-na">—</span></div>
                 <div class="col-price pegging-cell pegging-price-stack">
                   <span class="pegging-unit-price">{{ peg.goldPricePerGram | number:'1.2-2' }} ₺/gr</span>
-                  <span class="pegging-total-cash">Toplam {{ peg.cash | number:'1.2-3' }} ₺</span>
                 </div>
                 <div class="col-has pegging-cell">
                   <span class="has-value">+{{ peg.equivalentHasGram | number:'1.2-2' }}</span>
+                </div>
+                <div class="col-linetl pegging-cell pegging-line-total">
+                  {{ peg.cash | number:'1.2-3' }} ₺
                 </div>
                 <div class="col-desc pegging-cell">
                   <span class="pegging-desc-hint">Kasadan çıkan nakit → kasaya giren has</span>
@@ -118,6 +123,19 @@
                     </mat-select>
                   </mat-form-field>
                 </div>
+                <div class="col-tpl">
+                  <mat-form-field appearance="outline" class="compact-field tpl-select-field">
+                    <mat-select
+                      formControlName="productTemplateId"
+                      panelClass="basket-template-select-panel"
+                      (selectionChange)="onTemplatePicked($index, $event.value)">
+                      <mat-option [value]="null">Özel / elle</mat-option>
+                      @for (t of templates(); track t.id) {
+                        <mat-option [value]="t.id">{{ t.name }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </div>
                 <div class="col-qty">
                   <mat-form-field appearance="outline" class="compact-field">
                     <input matInput type="number" formControlName="quantity" step="0.001" min="0" />
@@ -125,26 +143,46 @@
                 </div>
                 <div class="col-mil">
                   <mat-form-field appearance="outline" class="compact-field">
-                    <input matInput type="number" formControlName="milyem" min="0" max="1000" />
+                    <input matInput type="number" formControlName="milyem" min="0" max="1000" step="0.001" />
                   </mat-form-field>
                 </div>
-                <div class="col-pc">
+                <div
+                  class="col-pc"
+                  [class.cell--purchase-inactive]="item.get('direction')?.value === 1">
                   <mat-form-field appearance="outline" class="compact-field">
                     <input matInput type="number" formControlName="pieceCount" min="0" />
                   </mat-form-field>
                 </div>
-                <div class="col-ul">
+                <div
+                  class="col-ul"
+                  [class.cell--purchase-inactive]="item.get('direction')?.value === 1">
                   <mat-form-field appearance="outline" class="compact-field">
                     <input matInput type="text" formControlName="unitLabour" mask="separator.2" thousandSeparator="." decimalMarker="," />
                   </mat-form-field>
                 </div>
                 <div class="col-price">
-                  <mat-form-field appearance="outline" class="compact-field">
+                  <mat-form-field appearance="outline" class="compact-field" [class.price-field--ref-warn]="showPriceWarning(item.getRawValue())">
                     <input matInput type="text" formControlName="price" mask="separator.2" thousandSeparator="." decimalMarker="," />
+                    @if (showPriceWarning(item.getRawValue())) {
+                      <mat-hint class="price-ref-hint">Referans kurdan belirgin fark (bilgi; kaydı engellemez).</mat-hint>
+                    }
                   </mat-form-field>
                 </div>
                 <div class="col-has">
                   <span class="has-value">{{ calcHasGram(item.getRawValue()) | number:'1.2-2' }}</span>
+                </div>
+                <div class="col-linetl">
+                  <mat-form-field appearance="outline" class="compact-field line-total-field">
+                    <input
+                      matInput
+                      type="text"
+                      formControlName="lineTotalTl"
+                      mask="separator.2"
+                      thousandSeparator="."
+                      decimalMarker=","
+                      matTooltip="Doğrudan toplam girebilirsiniz; birim fiyat yalnızca referans olur."
+                    />
+                  </mat-form-field>
                 </div>
                 <div class="col-desc">
                   <mat-form-field appearance="outline" class="compact-field">
@@ -194,6 +232,23 @@
 
     <!-- ─── RIGHT: Live Summary ─── -->
     <aside class="basket-sidebar">
+      <mat-card class="ref-rate-card">
+        <mat-card-header>
+          <mat-card-title>Referans HAS (₺/gr)</mat-card-title>
+          <mat-card-subtitle>Panel ile aynı kaynak — satırdaki “Has ₺/gr” ile karşılaştırın</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          @if (referenceHasMid(); as ref) {
+            <p class="ref-rate-value">{{ ref | number:'1.2-2' }} ₺/gr</p>
+            <p class="ref-rate-note">
+              <strong>Has ₺/gr</strong> veya <strong>Toplam ₺</strong>’den birini girin; toplamı elle yazdığınızda sistem onu korur, birim fiyatı türetir (kayıt engellenmez).
+            </p>
+          } @else {
+            <p class="ref-rate-missing">Referans yüklenemedi (zaman aşımı veya veri yok). Fiyatı doğrudan girin.</p>
+          }
+        </mat-card-content>
+      </mat-card>
+
       <mat-card class="summary-card">
         <mat-card-header>
           <div class="summary-header">
@@ -283,6 +338,7 @@
               <strong>Nakit bağlama:</strong> Liste ekranındaki net nakit / has değerleri bu işlem kaydıyla uyumludur; birim fiyat kayıtta tutulmadığından <strong>toplam nakit ÷ has gr</strong> ile gösterilir.
             } @else {
               <strong>Sepet mantığı:</strong> Aynı müşteri ile yapılan alış ve satış kalemleri netleştirilerek tek atomik işlem olarak kaydedilir.
+              <span class="info-extra"><strong>Alış</strong> satırlarında adet ve birim işçilik kapatılır; has = gr × milyem (0,916 ondalık veya 916 binlik). <strong>Toplam ₺</strong>’ü hesap makinesinden doğrudan girebilir veya <strong>Has ₺/gr</strong> ile otomatik toplam alırsınız. <strong>Satış</strong>ta şablondan gr, milyem ve işçilik gelir.</span>
             }
           </div>
         </mat-card-content>

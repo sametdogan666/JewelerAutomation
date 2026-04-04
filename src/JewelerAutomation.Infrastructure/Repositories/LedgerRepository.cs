@@ -109,4 +109,7 @@ public class LedgerRepository : Repository<LedgerEntry>, ILedgerRepository
     {
         return await Context.LedgerEntries.CountAsync(cancellationToken);
     }
+
+    public async Task<bool> AnyEntryForCustomerAsync(Guid customerId, CancellationToken cancellationToken = default)
+        => await Context.LedgerEntries.AnyAsync(e => e.CustomerId == customerId, cancellationToken);
 }

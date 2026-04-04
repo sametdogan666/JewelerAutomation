@@ -10,6 +10,7 @@ public interface ISafeMovementRepository
     Task<decimal> GetTotalHasGramBalanceAsync(CancellationToken cancellationToken = default);
     Task<SafeMovement> AddAsync(SafeMovement entity, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SafeMovement>> FindByCorrelationIdAsync(Guid correlationId, CancellationToken cancellationToken = default);
+    Task<bool> AnyVaultMovementForCustomerAsync(Guid customerId, CancellationToken cancellationToken = default);
     void Update(SafeMovement entity);
     void Delete(SafeMovement entity);
 }

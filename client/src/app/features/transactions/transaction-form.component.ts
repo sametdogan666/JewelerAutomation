@@ -20,9 +20,19 @@ import {
   TransactionDirection,
 } from '../../core/services/transactions.service';
 import { CustomersService, Customer } from '../../core/services/customers.service';
+import { DashboardService } from '../../core/services/dashboard.service';
+import {
+  ProductTemplate,
+  ProductTemplatesService,
+} from '../../core/services/product-templates.service';
+import { catchError, of, timeout } from 'rxjs';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { ThermalReceiptService } from '../../core/services/thermal-receipt.service';
 
 const MILYEM_FACTOR = 0.001;
 const LABOUR_FACTOR = 0.01;
+
+type PriceInputMode = 'unit' | 'total';
 
 interface ItemSummary {
   direction: 'Satış' | 'Alış';
@@ -63,6 +73,16 @@ export class TransactionFormComponent implements OnInit {
   private customersApi = inject(CustomersService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private dashboardApi = inject(DashboardService);
+  private productTemplatesApi = inject(ProductTemplatesService);
+  private snackBar = inject(MatSnackBar);
+  private thermalReceipt = inject(ThermalReceiptService);
+
+  /** Panel özeti ile aynı kaynak; sadece bilgi — satır fiyatına yazılmaz, kullanıcı girdisi esastır. */
+  referenceHasMid = signal<number | null>(null);
+
+  /** Ürün şablonları (Ayarlar); sepet satırı seçimi. */
+  templates = signal<ProductTemplate[]>([]);
 
   customers = signal<Customer[]>([]);
   saving = signal(false);
@@ -100,7 +120,7 @@ export class TransactionFormComponent implements OnInit {
     for (const it of items) {
       if (it.direction === 1) {
         has += this.calcHasGram(it);
-        cash += this.parseNum(it.price);
+        cash += this.effectiveLineTotalTl(it);
       }
     }
     return { hasGram: Math.round(has * 1e6) / 1e6, cash: Math.round(cash * 100) / 100 };
@@ -115,7 +135,7 @@ export class TransactionFormComponent implements OnInit {
     for (const it of items) {
       if (it.direction === 0) {
         has += this.calcHasGram(it);
-        cash += this.parseNum(it.price);
+        cash += this.effectiveLineTotalTl(it);
       }
     }
     return { hasGram: Math.round(has * 1e6) / 1e6, cash: Math.round(cash * 100) / 100 };
@@ -141,6 +161,12 @@ export class TransactionFormComponent implements OnInit {
   summaryCashDigits = computed(() => (this.nakitBaglamaDetail() ? '1.2-3' : '1.0-0'));
 
   ngOnInit(): void {
+    this.loadReferenceHasMid();
+    this.productTemplatesApi.getAll().subscribe({
+      next: (list) => this.templates.set(list),
+      error: () => this.templates.set([]),
+    });
+
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.editMode.set(true);
@@ -167,9 +193,24 @@ export class TransactionFormComponent implements OnInit {
           }
 
           for (const item of tx.items) {
-            this.addItem(item.direction, item.quantity, item.milyem,
-              item.pieceCount ?? 0, item.unitLabour ?? 0,
-              item.price ?? 0, item.description ?? '', item.id);
+            const lineTotal = item.price ?? 0;
+            const unitPrice =
+              item.hasGram > 1e-9
+                ? Math.round((lineTotal / item.hasGram) * 1e6) / 1e6
+                : lineTotal;
+            this.addItem(
+              item.direction,
+              item.quantity,
+              item.milyem,
+              item.pieceCount ?? 0,
+              item.unitLabour ?? 0,
+              unitPrice,
+              item.description ?? '',
+              item.id,
+              item.productTemplateId ?? null,
+              lineTotal,
+              'total'
+            );
           }
           if (tx.items.length === 0) {
             this.addItem();
@@ -183,6 +224,26 @@ export class TransactionFormComponent implements OnInit {
     this.customersApi.getAll().subscribe((list) => this.customers.set(list));
   }
 
+  private loadReferenceHasMid(): void {
+    this.dashboardApi
+      .getSummary()
+      .pipe(timeout(3000), catchError(() => of(null)))
+      .subscribe((s) => {
+        const mid = s?.liveHasTryPerGramMid;
+        this.referenceHasMid.set(typeof mid === 'number' && mid > 0 ? mid : null);
+      });
+  }
+
+  /** Referans kur ile satır fiyatı arasında anlamlı fark var mı (engel değil, uyarı). */
+  showPriceWarning(item: Record<string, unknown>): boolean {
+    if (item['priceInputMode'] === 'total') return false;
+    const ref = this.referenceHasMid();
+    if (ref == null || ref <= 0) return false;
+    const p = this.parseNum(item['price']);
+    if (p <= 0) return false;
+    return Math.abs(p - ref) / ref > 0.08;
+  }
+
   createItemGroup(
     direction: TransactionDirection = 1,
     quantity = 0,
@@ -191,20 +252,122 @@ export class TransactionFormComponent implements OnInit {
     unitLabour = 0,
     price: number = 0,
     description = '',
-    itemId: string | null = null
+    itemId: string | null = null,
+    productTemplateId: string | null = null,
+    lineTotalTl: number | null = null,
+    priceInputMode: PriceInputMode = 'unit'
   ): FormGroup {
     const g = this.fb.group({
       itemId: [itemId],
       direction: [direction as TransactionDirection, Validators.required],
       quantity: [quantity, [Validators.required, Validators.min(0.001)]],
       milyem: [milyem, [Validators.required, Validators.min(0), Validators.max(1000)]],
+      productTemplateId: [productTemplateId],
       pieceCount: [pieceCount],
       unitLabour: [unitLabour],
       price: [price as number | null],
+      lineTotalTl: [lineTotalTl as number | null],
+      priceInputMode: [priceInputMode],
       description: [description],
     });
+    g.get('direction')?.valueChanges.subscribe(() => this.applyRowRulesForDirection(g));
+    g.get('price')?.valueChanges.subscribe(() => {
+      g.get('priceInputMode')?.setValue('unit', { emitEvent: false });
+      this.syncLineTotalsForRow(g);
+    });
+    g.get('lineTotalTl')?.valueChanges.subscribe(() => {
+      g.get('priceInputMode')?.setValue('total', { emitEvent: false });
+      this.syncLineTotalsForRow(g);
+    });
+    for (const name of ['quantity', 'milyem', 'pieceCount', 'unitLabour'] as const) {
+      g.get(name)?.valueChanges.subscribe(() => this.syncLineTotalsForRow(g));
+    }
     g.valueChanges.subscribe(() => this.syncSnapshot());
+    this.applyRowRulesForDirection(g);
+    this.syncLineTotalsForRow(g);
     return g;
+  }
+
+  /**
+   * unit: Toplam = Has × birim (otomatik).
+   * total: Toplam elle; birim yalnızca referans (Has/Toplam), toplam ezilmez.
+   */
+  private syncLineTotalsForRow(g: FormGroup): void {
+    const raw = g.getRawValue();
+    const mode = raw.priceInputMode as PriceInputMode;
+    const has = this.calcHasGram(raw);
+    if (mode === 'unit') {
+      const u = this.parseNum(raw.price);
+      const t = Math.round(has * u * 100) / 100;
+      const cur = this.parseNum(g.get('lineTotalTl')?.value);
+      if (Math.abs(cur - t) > 0.009) {
+        g.get('lineTotalTl')?.setValue(t, { emitEvent: false });
+      }
+    } else {
+      const t = this.parseNum(raw.lineTotalTl);
+      if (has > 1e-9) {
+        const u = Math.round((t / has) * 1e6) / 1e6;
+        const curU = this.parseNum(g.get('price')?.value);
+        if (Math.abs(curU - u) > 1e-6) {
+          g.get('price')?.setValue(u, { emitEvent: false });
+        }
+      }
+    }
+    this.syncSnapshot();
+  }
+
+  /** Alış: adet ve birim işçilik kapalı ve sıfır; satış: açık. Şablon varsa türe göre milyem güncellenir. */
+  applyRowRulesForDirection(g: FormGroup): void {
+    const dir = g.get('direction')?.value as TransactionDirection;
+    const isPurchase = dir === 1;
+    const pc = g.get('pieceCount');
+    const ul = g.get('unitLabour');
+    if (isPurchase) {
+      pc?.disable({ emitEvent: false });
+      ul?.disable({ emitEvent: false });
+      pc?.setValue(0, { emitEvent: false });
+      ul?.setValue(0, { emitEvent: false });
+    } else {
+      pc?.enable({ emitEvent: false });
+      ul?.enable({ emitEvent: false });
+    }
+    this.syncTemplateMilyemIfSelected(g);
+    this.syncLineTotalsForRow(g);
+  }
+
+  /** Şablon seçiliyse satır milyemini türe göre şablondan yazar (Tür değişince has anında güncellenir). */
+  private syncTemplateMilyemIfSelected(g: FormGroup): void {
+    const tid = g.get('productTemplateId')?.value as string | null | undefined;
+    if (tid == null || String(tid).trim() === '') return;
+    const t = this.templates().find((x) => x.id === tid);
+    if (!t) return;
+    const dir = g.get('direction')?.value as TransactionDirection;
+    const m = dir === 0 ? t.milyemSatis : t.milyemAlis;
+    g.get('milyem')?.setValue(m, { emitEvent: true });
+  }
+
+  milyemFromTemplate(t: ProductTemplate, direction: TransactionDirection): number {
+    return direction === 0 ? t.milyemSatis : t.milyemAlis;
+  }
+
+  onTemplatePicked(rowIndex: number, templateId: string | null): void {
+    const g = this.itemsArray.at(rowIndex) as FormGroup;
+    if (!g) return;
+    if (!templateId) return;
+    const t = this.templates().find((x) => x.id === templateId);
+    if (!t) return;
+    const dir = g.get('direction')?.value as TransactionDirection;
+    const isSale = dir === 0;
+    const patch: Record<string, unknown> = {
+      milyem: this.milyemFromTemplate(t, dir),
+      description: t.name,
+      unitLabour: isSale ? t.defaultLaborPrice : 0,
+    };
+    if (t.defaultGram > 0) {
+      patch['quantity'] = t.defaultGram;
+    }
+    g.patchValue(patch);
+    this.applyRowRulesForDirection(g);
   }
 
   addItem(
@@ -215,10 +378,25 @@ export class TransactionFormComponent implements OnInit {
     unitLabour = 0,
     price: number = 0,
     description = '',
-    itemId: string | null = null
+    itemId: string | null = null,
+    productTemplateId: string | null = null,
+    lineTotalTl: number | null = null,
+    priceInputMode: PriceInputMode = 'unit'
   ): void {
     this.itemsArray.push(
-      this.createItemGroup(direction, quantity, milyem, pieceCount, unitLabour, price, description, itemId)
+      this.createItemGroup(
+        direction,
+        quantity,
+        milyem,
+        pieceCount,
+        unitLabour,
+        price,
+        description,
+        itemId,
+        productTemplateId,
+        lineTotalTl,
+        priceInputMode
+      )
     );
     this.syncSnapshot();
   }
@@ -233,16 +411,44 @@ export class TransactionFormComponent implements OnInit {
     this.itemsSnapshot.set(this.itemsArray.controls.map(c => c.getRawValue()));
   }
 
+  /** Brüt gr × ayar → has gr (milyem ≤ 1 ondalık saflık; üzeri binlik ayar). */
+  gramMilyemToHas(gram: number, milyem: number): number {
+    const g = Number(gram) || 0;
+    const m = Number(milyem) || 0;
+    if (m <= 1) {
+      return Math.round(g * m * 1e6) / 1e6;
+    }
+    return Math.round(g * m * MILYEM_FACTOR * 1e6) / 1e6;
+  }
+
   calcHasGram(item: any): number {
     const q = item.quantity ?? 0;
     const m = item.milyem ?? 0;
-    let has = q * m * MILYEM_FACTOR;
+    const dir = item.direction as TransactionDirection;
+    if (dir === 1) {
+      return this.gramMilyemToHas(q, m);
+    }
+    let has = this.gramMilyemToHas(q, m);
     const rawPc = item.pieceCount;
     const pcNum = typeof rawPc === 'number' ? rawPc : parseFloat(String(rawPc ?? '')) || 0;
     const labourPieces = pcNum < 1 ? 1 : pcNum;
     const ul = this.parseNum(item.unitLabour);
     has += labourPieces * ul * LABOUR_FACTOR;
     return Math.round(has * 1e6) / 1e6;
+  }
+
+  /** Özet / satır: toplam modunda kayıtlı toplam; birim modunda Has × birim. */
+  effectiveLineTotalTl(item: any): number {
+    const mode = item.priceInputMode as PriceInputMode | undefined;
+    if (mode === 'total') {
+      return Math.round(this.parseNum(item.lineTotalTl) * 100) / 100;
+    }
+    return this.calcLineTotalTlFromUnit(item);
+  }
+
+  /** Has × birim (gösterim; birim modunda toplam alanı ile aynı). */
+  calcLineTotalTlFromUnit(item: any): number {
+    return Math.round(this.calcHasGram(item) * this.parseNum(item.price) * 100) / 100;
   }
 
   parseNum(val: any): number {
@@ -297,22 +503,28 @@ export class TransactionFormComponent implements OnInit {
     if (this.nakitBaglamaDetail() || this.itemsArray.length === 0 || this.saving()) return;
 
     const header = this.headerForm.getRawValue();
-    const items: BasketItemCreate[] = this.itemsArray.controls.map(c => {
+    const items: BasketItemCreate[] = this.itemsArray.controls.map((c) => {
       const v = c.getRawValue();
       const rawId = v.itemId as string | null | undefined;
       const id =
         this.editMode() && rawId && String(rawId).trim().length > 0
           ? String(rawId).trim()
           : undefined;
+      const isPurchase = v.direction === 1;
+      const mode = v.priceInputMode as PriceInputMode;
+      const unit = this.parseNum(v.price);
+      const lt = this.parseNum(v.lineTotalTl);
       return {
         ...(id ? { id } : {}),
         direction: v.direction,
         quantity: v.quantity,
         milyem: v.milyem,
-        pieceCount: v.pieceCount && v.pieceCount > 0 ? v.pieceCount : undefined,
-        unitLabour: this.parseNum(v.unitLabour) || undefined,
-        price: this.parseNum(v.price) || undefined,
+        pieceCount: isPurchase ? undefined : v.pieceCount && v.pieceCount > 0 ? v.pieceCount : undefined,
+        unitLabour: isPurchase ? undefined : this.parseNum(v.unitLabour) || undefined,
+        price: mode === 'unit' ? (unit || undefined) : undefined,
+        lineTotal: mode === 'total' ? lt : undefined,
         description: v.description || undefined,
+        productTemplateId: (v.productTemplateId as string | null) || undefined,
       };
     });
 
@@ -329,11 +541,20 @@ export class TransactionFormComponent implements OnInit {
       : this.transactionsApi.create(dto);
 
     op.subscribe({
-      next: () => {
+      next: async (saved) => {
         this.saving.set(false);
+        try {
+          await this.thermalReceipt.openReceipt(saved);
+        } catch (err) {
+          console.error(err);
+          this.snackBar.open('Fiş PDF açılamadı; kayıt tamamlandı.', 'Tamam', { duration: 6000 });
+        }
         this.router.navigate(['/transactions']);
       },
-      error: () => this.saving.set(false),
+      error: () => {
+        this.saving.set(false);
+        this.snackBar.open('Kayıt başarısız; sepet korundu. Tekrar deneyebilirsiniz.', 'Tamam', { duration: 7000 });
+      },
     });
   }
 }

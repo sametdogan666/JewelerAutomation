@@ -1,10 +1,27 @@
-import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
+import { Component, computed, input } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { DecimalPipe, NgClass } from '@angular/common';
-import { Subscription } from 'rxjs';
-import { SafeService, SafeStatus } from '../../core/services/safe.service';
-import { DashboardRefreshService } from '../../core/services/dashboard-refresh.service';
+import { SafeStatus } from '../../core/services/safe.service';
+import { DashboardSummary } from '../../core/services/dashboard.service';
+
+function safeStatusFromDashboard(d: DashboardSummary): SafeStatus {
+  return {
+    physicalGoldBalance: d.physicalGoldBalance ?? 0,
+    physicalCashBalance: d.physicalCashBalance ?? 0,
+    expectedGold: d.expectedGold ?? 0,
+    goldGapOrSurplus: d.goldGapOrSurplus ?? 0,
+    customerGoldDebt: d.totalCustomerGoldDebt ?? 0,
+    customerGoldReceivable: d.totalCustomerGoldReceivable ?? 0,
+    personalGoldDebt: d.totalPersonalGoldDebt ?? 0,
+    personalGoldReceivable: d.totalPersonalGoldReceivable ?? 0,
+    netGoldPosition: d.netGoldPositionHasGram ?? 0,
+    netCashPosition: d.netCashPositionTl ?? 0,
+    profitHasGram: d.profitHasGram ?? 0,
+    cumulativePeggingProfitHasGram: d.cumulativePeggingProfitHasGram ?? 0,
+    peggingCount: d.peggingCount ?? 0,
+  };
+}
 
 @Component({
   selector: 'app-safe-status-widget',
@@ -18,13 +35,26 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
           <div>
             <h2 class="widget-title">Kasa & Finansal Durum</h2>
             <p class="widget-subtitle">Fiziksel bakiye ve net pozisyon</p>
+            @if (liveMid()) {
+              <p class="widget-live">
+                @if (ratesFromManual()) {
+                  <span>Manuel kur {{ liveMid() | number:'1.2-2' }} ₺/gr</span>
+                } @else if (ratesFromDefault()) {
+                  <span>Varsayılan kur {{ liveMid() | number:'1.2-2' }} ₺/gr</span>
+                } @else {
+                  <span>Canlı has {{ liveMid() | number:'1.2-2' }} ₺/gr</span>
+                }
+                @if (netGoldTl()) {
+                  <span> · Net Altın ≈ {{ netGoldTl() | number:'1.0-0' }} ₺</span>
+                }
+              </p>
+            } @else if (showHasRateNa()) {
+              <p class="widget-live widget-live--muted">Has kuru: N/A</p>
+            }
           </div>
         </div>
       </mat-card-header>
       <mat-card-content>
-        @if (loading()) {
-          <div class="loading-state">Yükleniyor...</div>
-        } @else if (status()) {
           <div class="sections">
 
             <!-- ─── SECTION 1: Physical Balance (Brüt Kasa) ─── -->
@@ -40,7 +70,7 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
                   <div class="metric-icon gold"><mat-icon>stars</mat-icon></div>
                   <div class="metric-body">
                     <span class="metric-label">Altın</span>
-                    <span class="metric-value">{{ status()!.physicalGoldBalance | number:'1.2-2' }} <small>Has Gr</small></span>
+                    <span class="metric-value">{{ statusView()!.physicalGoldBalance | number:'1.2-2' }} <small>Has Gr</small></span>
                   </div>
                 </div>
 
@@ -48,7 +78,7 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
                   <div class="metric-icon cash"><mat-icon>payments</mat-icon></div>
                   <div class="metric-body">
                     <span class="metric-label">Nakit</span>
-                    <span class="metric-value">{{ status()!.physicalCashBalance | number:'1.2-2' }} <small>₺</small></span>
+                    <span class="metric-value">{{ statusView()!.physicalCashBalance | number:'1.2-2' }} <small>₺</small></span>
                   </div>
                 </div>
 
@@ -56,12 +86,12 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
                   <div class="metric-icon gap"><mat-icon>{{ gapIcon() }}</mat-icon></div>
                   <div class="metric-body">
                     <span class="metric-label">Açık satış (FIFO)</span>
-                    <span class="metric-value">{{ status()!.goldGapOrSurplus >= 0 ? '+' : '' }}{{ status()!.goldGapOrSurplus | number:'1.2-2' }} <small>Has Gr</small></span>
-                    @if (status()!.goldGapOrSurplus > 0.001) {
+                    <span class="metric-value">{{ statusView()!.goldGapOrSurplus >= 0 ? '+' : '' }}{{ statusView()!.goldGapOrSurplus | number:'1.2-2' }} <small>Has Gr</small></span>
+                    @if (statusView()!.goldGapOrSurplus > 0.001) {
                       <span class="metric-badge badge--surplus">
                         <mat-icon>check_circle</mat-icon> Alış Fazlası
                       </span>
-                    } @else if (status()!.goldGapOrSurplus < -0.001) {
+                    } @else if (statusView()!.goldGapOrSurplus < -0.001) {
                       <span class="metric-badge badge--shortage">
                         <mat-icon>warning</mat-icon> Satış Açığı
                       </span>
@@ -85,14 +115,14 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
                   <div class="net-icon"><mat-icon>trending_up</mat-icon></div>
                   <div class="net-body">
                     <span class="net-label">Net Altın</span>
-                    <span class="net-value">{{ status()!.netGoldPosition | number:'1.2-2' }} <small>Has Gr</small></span>
+                    <span class="net-value">{{ statusView()!.netGoldPosition | number:'1.2-2' }} <small>Has Gr</small></span>
                   </div>
                 </div>
                 <div class="net-position-card net-position-card--cash">
                   <div class="net-icon net-icon--cash"><mat-icon>payments</mat-icon></div>
                   <div class="net-body">
                     <span class="net-label">Net Nakit</span>
-                    <span class="net-value">{{ status()!.netCashPosition | number:'1.0-0' }} <small>₺</small></span>
+                    <span class="net-value">{{ statusView()!.netCashPosition | number:'1.0-0' }} <small>₺</small></span>
                   </div>
                 </div>
               </div>
@@ -102,45 +132,45 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
                   <mat-icon class="debt-icon receivable">store</mat-icon>
                   <div class="debt-body">
                     <span class="debt-label">Carilerden Alacak</span>
-                    <span class="debt-value">+{{ status()!.customerGoldReceivable | number:'1.2-2' }}</span>
+                    <span class="debt-value">+{{ statusView()!.customerGoldReceivable | number:'1.2-2' }}</span>
                   </div>
                 </div>
                 <div class="debt-item">
                   <mat-icon class="debt-icon debt">business</mat-icon>
                   <div class="debt-body">
                     <span class="debt-label">Carilere Borç</span>
-                    <span class="debt-value">−{{ status()!.customerGoldDebt | number:'1.2-2' }}</span>
+                    <span class="debt-value">−{{ statusView()!.customerGoldDebt | number:'1.2-2' }}</span>
                   </div>
                 </div>
                 <div class="debt-item">
                   <mat-icon class="debt-icon receivable">people_alt</mat-icon>
                   <div class="debt-body">
                     <span class="debt-label">Şahıslardan Alacak</span>
-                    <span class="debt-value">+{{ status()!.personalGoldReceivable | number:'1.2-2' }}</span>
+                    <span class="debt-value">+{{ statusView()!.personalGoldReceivable | number:'1.2-2' }}</span>
                   </div>
                 </div>
                 <div class="debt-item">
                   <mat-icon class="debt-icon debt">person</mat-icon>
                   <div class="debt-body">
                     <span class="debt-label">Şahıslara Borç</span>
-                    <span class="debt-value">−{{ status()!.personalGoldDebt | number:'1.2-2' }}</span>
+                    <span class="debt-value">−{{ statusView()!.personalGoldDebt | number:'1.2-2' }}</span>
                   </div>
                 </div>
               </div>
 
               <!-- Profit (reporting only) -->
               <div class="profit-strip" [ngClass]="profitClass()">
-                <mat-icon>{{ status()!.profitHasGram >= 0 ? 'trending_up' : 'trending_down' }}</mat-icon>
+                <mat-icon>{{ statusView()!.profitHasGram >= 0 ? 'trending_up' : 'trending_down' }}</mat-icon>
                 <span class="profit-label">Kâr / Zarar</span>
                 <span class="profit-value">
-                  {{ status()!.profitHasGram >= 0 ? '+' : '' }}{{ status()!.profitHasGram | number:'1.2-2' }} Has Gr
+                  {{ statusView()!.profitHasGram >= 0 ? '+' : '' }}{{ statusView()!.profitHasGram | number:'1.2-2' }} Has Gr
                 </span>
                 <span class="profit-hint">(performans göstergesi)</span>
               </div>
             </div>
 
             <!-- ─── SECTION 3: Net Performance (Mali Analiz) ─── -->
-            @if (status()!.peggingCount > 0) {
+            @if (statusView()!.peggingCount > 0) {
               <div class="section performance-section">
                 <h3 class="section-title">
                   <mat-icon>insights</mat-icon>
@@ -151,28 +181,25 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
                 <div class="performance-card" [ngClass]="perfClass()">
                   <div class="perf-main">
                     <div class="perf-icon-wrap">
-                      <mat-icon>{{ status()!.cumulativePeggingProfitHasGram >= 0 ? 'emoji_events' : 'warning' }}</mat-icon>
+                      <mat-icon>{{ statusView()!.cumulativePeggingProfitHasGram >= 0 ? 'emoji_events' : 'warning' }}</mat-icon>
                     </div>
                     <div class="perf-body">
                       <span class="perf-label">Toplam Gerçekleşen Kâr</span>
                       <span class="perf-value">
-                        {{ status()!.cumulativePeggingProfitHasGram >= 0 ? '+' : '' }}{{ status()!.cumulativePeggingProfitHasGram | number:'1.4-4' }}
+                        {{ statusView()!.cumulativePeggingProfitHasGram >= 0 ? '+' : '' }}{{ statusView()!.cumulativePeggingProfitHasGram | number:'1.4-4' }}
                         <small>Has Gr</small>
                       </span>
                     </div>
                   </div>
                   <div class="perf-meta">
                     <mat-icon>receipt_long</mat-icon>
-                    <span>{{ status()!.peggingCount }} bağlama işlemi</span>
+                    <span>{{ statusView()!.peggingCount }} bağlama işlemi</span>
                   </div>
                 </div>
               </div>
             }
 
           </div>
-        } @else {
-          <div class="error-state">Veri yüklenemedi.</div>
-        }
       </mat-card-content>
     </mat-card>
   `,
@@ -200,6 +227,8 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
     .widget-icon { font-size: 2rem; width: 2rem; height: 2rem; color: rgba(255,255,255,.9); }
     .widget-title { margin: 0; font-size: 1.5rem; font-weight: 600; color: white; }
     .widget-subtitle { margin: .25rem 0 0; font-size: .85rem; color: rgba(255,255,255,.7); }
+    .widget-live { margin: .35rem 0 0; font-size: .78rem; color: rgba(255,255,255,.85); font-weight: 500; }
+    .widget-live--muted { color: rgba(255,255,255,.65); font-style: italic; }
 
     .sections { display: flex; flex-direction: column; gap: 0.85rem; margin-top: 0.35rem; }
 
@@ -374,52 +403,39 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
     }
   `]
 })
-export class SafeStatusWidgetComponent implements OnInit, OnDestroy {
-  private safeService = inject(SafeService);
-  private refreshService = inject(DashboardRefreshService);
-  private refreshSub?: Subscription;
+export class SafeStatusWidgetComponent {
+  /** Panel özeti — her zaman dolu (üst bileşen varsayılan nesne verir); async yükleme yok. */
+  dashboard = input.required<DashboardSummary>();
 
-  status = signal<SafeStatus | null>(null);
-  loading = signal(true);
+  statusView = computed(() => safeStatusFromDashboard(this.dashboard()));
 
-  ngOnInit(): void {
-    this.loadStatus();
-    this.refreshSub = this.refreshService.refresh$.subscribe(() => this.loadStatus());
-  }
-
-  ngOnDestroy(): void {
-    this.refreshSub?.unsubscribe();
-  }
-
-  loadStatus(): void {
-    this.loading.set(true);
-    this.safeService.getStatus().subscribe({
-      next: (data) => { this.status.set(data); this.loading.set(false); },
-      error: () => this.loading.set(false)
-    });
-  }
+  liveMid = computed(() => this.dashboard().liveHasTryPerGramMid ?? null);
+  netGoldTl = computed(() => this.dashboard().netGoldPositionTlApprox ?? null);
+  ratesFromManual = computed(() => this.dashboard().ratesFromManualOverride === true);
+  ratesFromDefault = computed(() => this.dashboard().ratesFromDefaultFallback === true);
+  showHasRateNa = computed(() => !this.dashboard().ratesAvailable && this.liveMid() == null);
 
   gapClass(): string {
-    const gap = this.status()?.goldGapOrSurplus ?? 0;
+    const gap = this.statusView().goldGapOrSurplus ?? 0;
     if (gap > 0.001) return 'metric--surplus';
     if (gap < -0.001) return 'metric--shortage';
     return '';
   }
 
   gapIcon(): string {
-    const gap = this.status()?.goldGapOrSurplus ?? 0;
+    const gap = this.statusView().goldGapOrSurplus ?? 0;
     if (gap > 0.001) return 'trending_up';
     if (gap < -0.001) return 'trending_down';
     return 'horizontal_rule';
   }
 
   profitClass(): string {
-    const p = this.status()?.profitHasGram ?? 0;
+    const p = this.statusView().profitHasGram ?? 0;
     return p >= 0 ? 'profit--gain' : 'profit--loss';
   }
 
   perfClass(): string {
-    const v = this.status()?.cumulativePeggingProfitHasGram ?? 0;
+    const v = this.statusView().cumulativePeggingProfitHasGram ?? 0;
     return v >= 0 ? 'performance--gain' : 'performance--loss';
   }
 }

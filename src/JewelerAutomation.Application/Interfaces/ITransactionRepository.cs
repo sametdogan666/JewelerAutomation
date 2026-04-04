@@ -9,6 +9,7 @@ public interface ITransactionRepository
     Task<IReadOnlyList<Transaction>> GetByDateRangeAsync(DateTime from, DateTime to, CancellationToken cancellationToken = default);
     Task<Transaction> AddAsync(Transaction entity, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Transaction>> FindByCorrelationIdAsync(Guid correlationId, CancellationToken cancellationToken = default);
+    Task<bool> AnyByCustomerIdAsync(Guid customerId, CancellationToken cancellationToken = default);
     void Update(Transaction entity);
     void Delete(Transaction entity);
     void RemoveItems(IEnumerable<TransactionItem> items);

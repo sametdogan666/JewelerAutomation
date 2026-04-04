@@ -22,6 +22,50 @@ namespace JewelerAutomation.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("JewelerAutomation.Core.Entities.AuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Action")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(96)
+                        .HasColumnType("character varying(96)");
+
+                    b.Property<string>("EntityName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("NewValues")
+                        .HasColumnType("text");
+
+                    b.Property<string>("OldValues")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Timestamp");
+
+                    b.HasIndex("EntityName", "Timestamp");
+
+                    b.ToTable("AuditLogs");
+                });
+
             modelBuilder.Entity("JewelerAutomation.Core.Entities.CashPeggingFifoDetail", b =>
                 {
                     b.Property<Guid>("Id")
@@ -56,7 +100,7 @@ namespace JewelerAutomation.Infrastructure.Migrations
 
                     b.HasIndex("GoldTransactionId");
 
-                    b.ToTable("CashPeggingFifoDetails", (string)null);
+                    b.ToTable("CashPeggingFifoDetails");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.CashPeggingLog", b =>
@@ -131,7 +175,7 @@ namespace JewelerAutomation.Infrastructure.Migrations
 
                     b.HasIndex("PeggingDate");
 
-                    b.ToTable("CashPeggingLogs", (string)null);
+                    b.ToTable("CashPeggingLogs");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.CashToGoldConversion", b =>
@@ -180,7 +224,7 @@ namespace JewelerAutomation.Infrastructure.Migrations
 
                     b.HasIndex("TransactionDate");
 
-                    b.ToTable("CashToGoldConversions", (string)null);
+                    b.ToTable("CashToGoldConversions");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.Customer", b =>
@@ -200,6 +244,9 @@ namespace JewelerAutomation.Infrastructure.Migrations
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -221,7 +268,9 @@ namespace JewelerAutomation.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Customers", (string)null);
+                    b.HasIndex("IsActive");
+
+                    b.ToTable("Customers");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.CustomerMovement", b =>
@@ -288,7 +337,7 @@ namespace JewelerAutomation.Infrastructure.Migrations
 
                     b.HasIndex("CustomerId");
 
-                    b.ToTable("CustomerMovements", (string)null);
+                    b.ToTable("CustomerMovements");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.CustomerTransaction", b =>
@@ -342,7 +391,84 @@ namespace JewelerAutomation.Infrastructure.Migrations
 
                     b.HasIndex("CustomerId");
 
-                    b.ToTable("CustomerTransactions", (string)null);
+                    b.ToTable("CustomerTransactions");
+                });
+
+            modelBuilder.Entity("JewelerAutomation.Core.Entities.DailyGoldRate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AvgHasTryBuy")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("AvgHasTryMid")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("AvgHasTrySell")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTime>("BucketStartUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("ClosingUsdTryMid")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<byte>("Kind")
+                        .HasColumnType("smallint");
+
+                    b.Property<DateTime>("RecordedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("SampleCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BucketStartUtc", "Kind")
+                        .IsUnique();
+
+                    b.ToTable("DailyGoldRates");
+                });
+
+            modelBuilder.Entity("JewelerAutomation.Core.Entities.GoldRate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("EffectiveDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("HasTryPerGramMid")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<bool>("IsManual")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("RecordedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("SetAtUtc");
+
+                    b.Property<Guid?>("SetByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("UsdTryMid")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EffectiveDate", "IsManual")
+                        .IsUnique();
+
+                    b.ToTable("GoldRates", (string)null);
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.GoldTransaction", b =>
@@ -388,7 +514,7 @@ namespace JewelerAutomation.Infrastructure.Migrations
 
                     b.HasIndex("IsFullyLinked", "RemainingGram");
 
-                    b.ToTable("GoldTransactions", (string)null);
+                    b.ToTable("GoldTransactions");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.Inventory", b =>
@@ -437,7 +563,7 @@ namespace JewelerAutomation.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Inventories", (string)null);
+                    b.ToTable("Inventories");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.LedgerEntry", b =>
@@ -498,7 +624,7 @@ namespace JewelerAutomation.Infrastructure.Migrations
 
                     b.HasIndex("ReferenceType", "ReferenceId");
 
-                    b.ToTable("LedgerEntries", (string)null);
+                    b.ToTable("LedgerEntries");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.LinkingDetail", b =>
@@ -535,7 +661,7 @@ namespace JewelerAutomation.Infrastructure.Migrations
 
                     b.HasIndex("LinkingProcessId");
 
-                    b.ToTable("LinkingDetails", (string)null);
+                    b.ToTable("LinkingDetails");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.LinkingProcess", b =>
@@ -584,7 +710,57 @@ namespace JewelerAutomation.Infrastructure.Migrations
 
                     b.HasIndex("SafeMovementId");
 
-                    b.ToTable("LinkingProcesses", (string)null);
+                    b.ToTable("LinkingProcesses");
+                });
+
+            modelBuilder.Entity("JewelerAutomation.Core.Entities.ProductTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("DefaultGram")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<decimal>("DefaultLaborPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("MilyemAlis")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<decimal>("MilyemSatis")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name");
+
+                    b.ToTable("ProductTemplates");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.SafeMovement", b =>
@@ -636,7 +812,7 @@ namespace JewelerAutomation.Infrastructure.Migrations
 
                     b.HasIndex("CorrelationId");
 
-                    b.ToTable("SafeMovements", (string)null);
+                    b.ToTable("SafeMovements");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.Transaction", b =>
@@ -725,7 +901,7 @@ namespace JewelerAutomation.Infrastructure.Migrations
 
                     b.HasIndex("CustomerId");
 
-                    b.ToTable("Transactions", (string)null);
+                    b.ToTable("Transactions");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.TransactionItem", b =>
@@ -768,6 +944,9 @@ namespace JewelerAutomation.Infrastructure.Migrations
                         .HasPrecision(18, 6)
                         .HasColumnType("numeric(18,6)");
 
+                    b.Property<Guid?>("ProductTemplateId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("Quantity")
                         .HasPrecision(18, 6)
                         .HasColumnType("numeric(18,6)");
@@ -788,9 +967,11 @@ namespace JewelerAutomation.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ProductTemplateId");
+
                     b.HasIndex("TransactionId");
 
-                    b.ToTable("TransactionItems", (string)null);
+                    b.ToTable("TransactionItems");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.User", b =>
@@ -841,7 +1022,7 @@ namespace JewelerAutomation.Infrastructure.Migrations
                     b.HasIndex("NormalizedUserName")
                         .IsUnique();
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.CashPeggingFifoDetail", b =>
@@ -957,20 +1138,25 @@ namespace JewelerAutomation.Infrastructure.Migrations
                     b.HasOne("JewelerAutomation.Core.Entities.Customer", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Customer");
                 });
 
             modelBuilder.Entity("JewelerAutomation.Core.Entities.TransactionItem", b =>
                 {
+                    b.HasOne("JewelerAutomation.Core.Entities.ProductTemplate", "ProductTemplate")
+                        .WithMany()
+                        .HasForeignKey("ProductTemplateId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("JewelerAutomation.Core.Entities.Transaction", "Transaction")
                         .WithMany("Items")
                         .HasForeignKey("TransactionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("GoldTransactions");
+                    b.Navigation("ProductTemplate");
 
                     b.Navigation("Transaction");
                 });
@@ -995,6 +1181,11 @@ namespace JewelerAutomation.Infrastructure.Migrations
             modelBuilder.Entity("JewelerAutomation.Core.Entities.Transaction", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("JewelerAutomation.Core.Entities.TransactionItem", b =>
+                {
+                    b.Navigation("GoldTransactions");
                 });
 #pragma warning restore 612, 618
         }

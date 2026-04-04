@@ -15,6 +15,7 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { TransactionsService, Transaction, TransactionDirection } from '../../core/services/transactions.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { DashboardRefreshService } from '../../core/services/dashboard-refresh.service';
+import { ThermalReceiptService } from '../../core/services/thermal-receipt.service';
 
 @Component({
   selector: 'app-transactions-list',
@@ -43,10 +44,12 @@ export class TransactionsListComponent implements OnInit {
   private cdr = inject(ChangeDetectorRef);
   private notify = inject(NotificationService);
   private refreshService = inject(DashboardRefreshService);
+  private thermalReceipt = inject(ThermalReceiptService);
 
   dataSource = new MatTableDataSource<Transaction>([]);
   loading = signal(true);
   deleting = signal<string | null>(null);
+  printing = signal<string | null>(null);
   expandedRow = signal<string | null>(null);
   displayedColumns: string[] = [
     'transactionDate', 'itemCount', 'direction', 'netHasGram', 'netCashAmount',
@@ -163,6 +166,20 @@ export class TransactionsListComponent implements OnInit {
 
   toggleExpand(tx: Transaction): void {
     this.expandedRow.set(this.expandedRow() === tx.id ? null : tx.id);
+  }
+
+  async printReceipt(tx: Transaction): Promise<void> {
+    this.printing.set(tx.id);
+    this.cdr.detectChanges();
+    try {
+      await this.thermalReceipt.openReceipt(tx);
+    } catch (err) {
+      console.error(err);
+      this.notify.error('Fiş', 'PDF oluşturulamadı. Açılır pencere engellenmiş olabilir; tekrar deneyin.');
+    } finally {
+      this.printing.set(null);
+      this.cdr.detectChanges();
+    }
   }
 
   async onDelete(tx: Transaction): Promise<void> {

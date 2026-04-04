@@ -12,6 +12,9 @@ public class Customer : BaseEntity
     public CustomerType Type { get; set; } = CustomerType.Cari;
     public string? Description { get; set; }
 
+    /// <summary>False = pasif (silinmiş); finansal geçmişi olan cariler fiziksel silinmez.</summary>
+    public bool IsActive { get; set; } = true;
+
     public ICollection<CustomerMovement> Movements { get; set; } = new List<CustomerMovement>();
     public ICollection<CustomerTransaction> AccountTransactions { get; set; } = new List<CustomerTransaction>();
 }

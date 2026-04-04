@@ -1,26 +1,70 @@
+using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using JewelerAutomation.Application.Interfaces;
+using JewelerAutomation.Application.Options;
 using JewelerAutomation.Application.Services;
 using JewelerAutomation.Core.Entities;
+using JewelerAutomation.Infrastructure.Auditing;
 using JewelerAutomation.Infrastructure.Data;
+using JewelerAutomation.Infrastructure.GoldRates;
 using JewelerAutomation.Infrastructure.Repositories;
+using JewelerAutomation.WebAPI.HostedServices;
+using JewelerAutomation.WebAPI.Hubs;
 using JewelerAutomation.WebAPI.Services;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // DbContext - MSSQL veya PostgreSQL (appsettings'ten ConnectionStrings:DefaultConnection)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var usePostgres = builder.Configuration.GetValue<bool>("UsePostgres");
-if (usePostgres)
-    builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(connectionString));
-else
-    builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlServer(connectionString));
+
+builder.Services.AddMemoryCache();
+builder.Services.Configure<HaremGoldOptions>(builder.Configuration.GetSection(HaremGoldOptions.SectionName));
+builder.Services.Configure<GoldRateFallbackOptions>(builder.Configuration.GetSection(GoldRateFallbackOptions.SectionName));
+builder.Services.Configure<GoldScraperOptions>(builder.Configuration.GetSection(GoldScraperOptions.SectionName));
+builder.Services.AddHttpClient("GoldScraper", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(6);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
+});
+builder.Services.AddHttpClient("HaremAltin", (sp, client) =>
+{
+    var o = sp.GetRequiredService<IOptions<HaremGoldOptions>>().Value;
+    var baseUrl = string.IsNullOrWhiteSpace(o.BaseUrl) ? "https://haremapi.tr/api/v1" : o.BaseUrl.TrimEnd('/');
+    client.BaseAddress = new Uri(baseUrl + "/");
+    client.Timeout = TimeSpan.FromSeconds(Math.Clamp(
+        sp.GetRequiredService<IOptions<HaremGoldOptions>>().Value.RequestTimeoutSeconds + 2,
+        3,
+        120));
+});
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddScoped<AuditSaveChangesInterceptor>();
+
+builder.Services.AddDbContext<AppDbContext>((sp, options) =>
+{
+    if (usePostgres)
+        options.UseNpgsql(connectionString);
+    else
+        options.UseSqlServer(connectionString);
+    options.AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>());
+});
 
 // Repositories & Unit of Work
+builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+builder.Services.AddScoped<IDailyGoldRateRepository, DailyGoldRateRepository>();
+builder.Services.AddScoped<IGoldRatesRepository, GoldRatesRepository>();
+builder.Services.AddSingleton<IGoldRateCircuitBreaker, GoldRateCircuitBreaker>();
+builder.Services.AddScoped<IGoldRateService, GoldRateService>();
+builder.Services.AddScoped<IDashboardSummaryService, DashboardRawSummaryService>();
+builder.Services.AddHostedService<GoldRateBackgroundService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
@@ -31,6 +75,7 @@ builder.Services.AddScoped<ICustomerTransactionRepository, CustomerTransactionRe
 builder.Services.AddScoped<ICashPeggingLogRepository, CashPeggingLogRepository>();
 builder.Services.AddScoped<ILedgerRepository, LedgerRepository>();
 builder.Services.AddScoped<ICashToGoldConversionRepository, CashToGoldConversionRepository>();
+builder.Services.AddScoped<IProductTemplateRepository, ProductTemplateRepository>();
 builder.Services.AddScoped<IGoldTransactionRepository, GoldTransactionRepository>();
 builder.Services.AddScoped<ILinkingProcessRepository, LinkingProcessRepository>();
 builder.Services.AddScoped<IRepository<LinkingDetail>, LinkingDetailRepository>();
@@ -46,6 +91,7 @@ builder.Services.AddScoped<IProfitCalculationService, ProfitCalculationService>(
 builder.Services.AddScoped<ILedgerService, LedgerService>();
 builder.Services.AddScoped<ILedgerMigrationService, LedgerMigrationService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
+builder.Services.AddScoped<ICustomerService, CustomerService>();
 
 // JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "JewelerAutomationSecretKeyMinimum32Characters!";
@@ -62,10 +108,25 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidAudience = builder.Configuration["Jwt:Audience"] ?? "JewelerAutomation",
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromSeconds(30) // Küçük saat farkında 401 önlenir
+            ClockSkew = TimeSpan.FromSeconds(30), // Küçük saat farkında 401 önlenir
+            NameClaimType = ClaimTypes.Name,
+            RoleClaimType = ClaimTypes.Role
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var path = context.HttpContext.Request.Path;
+                if (path.StartsWithSegments("/hubs")
+                    && context.Request.Query.TryGetValue("access_token", out var token)
+                    && !string.IsNullOrEmpty(token))
+                    context.Token = token;
+                return Task.CompletedTask;
+            }
         };
     });
 builder.Services.AddAuthorization();
+builder.Services.AddSignalR();
 
 builder.Services.AddCors(options =>
 {
@@ -121,6 +182,7 @@ if (!app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<GoldRatesHub>("/hubs/gold-rates");
 
 // İlk çalıştırmada migration uygula (veritabanı yoksa oluşturulur)
 using (var scope = app.Services.CreateScope())

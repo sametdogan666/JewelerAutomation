@@ -184,3 +184,17 @@ body {
 .snackbar-error .mdc-snackbar__action:not(:disabled) {
   color: #ef9a9a !important;
 }
+
+/* Sepet: ürün şablonu açılır liste — uzun adlar okunaklı */
+.basket-template-select-panel.mat-mdc-select-panel {
+  min-width: min(520px, 94vw) !important;
+  max-width: min(720px, 96vw);
+}
+
+.basket-template-select-panel .mat-mdc-option.mdc-list-item {
+  min-height: 3rem;
+  align-items: center;
+  white-space: normal;
+  line-height: 1.35;
+  word-break: break-word;
+}

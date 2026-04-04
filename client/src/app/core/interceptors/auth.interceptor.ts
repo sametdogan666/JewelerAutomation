@@ -56,6 +56,14 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         snackBar.open('Sunucuya ulaşılamıyor.', 'Kapat', { duration: 5000 });
         return throwError(() => err);
       }
+      // Sepet kaydı: bileşen kendi mesajını gösterir; çift snackbar önlenir.
+      const pathOnly = url.split('?')[0].replace(/\/+$/, '');
+      const isBasketSave =
+        (req.method === 'POST' && pathOnly.endsWith('/transactions')) ||
+        (req.method === 'PUT' && /\/transactions\/[^/]+$/.test(pathOnly));
+      if (isBasketSave && err.status >= 400) {
+        return throwError(() => err);
+      }
       const message =
         typeof err.error === 'string'
           ? err.error

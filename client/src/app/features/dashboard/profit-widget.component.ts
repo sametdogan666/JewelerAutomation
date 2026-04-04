@@ -1,10 +1,23 @@
-import { Component, inject, OnInit, OnDestroy, signal } from '@angular/core';
+import { Component, computed, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
-import { Subscription } from 'rxjs';
-import { CapitalService, CapitalSummary } from '../../core/services/capital.service';
-import { DashboardRefreshService } from '../../core/services/dashboard-refresh.service';
+import { CapitalSummary } from '../../core/services/capital.service';
+import { DashboardSummary } from '../../core/services/dashboard.service';
+
+function capitalSummaryFromDashboard(d: DashboardSummary): CapitalSummary {
+  // Net sermaye: önce defter/cari tabanlı (kur bağımsız); kur ile "canlı fiyat" satırı ayrı alanda isteğe bağlı.
+  const net = d.netGoldCapitalHasGram ?? d.netSermayeHasGramAtLivePrice ?? 0;
+  return {
+    totalGoldInSafe: d.totalGoldInSafe ?? 0,
+    totalCashInSafe: d.totalCashInSafe ?? 0,
+    totalCustomerGoldDebt: d.totalCustomerGoldDebt ?? 0,
+    totalCustomerGoldReceivable: d.totalCustomerGoldReceivable ?? 0,
+    totalPersonalGoldDebt: d.totalPersonalGoldDebt ?? 0,
+    totalPersonalGoldReceivable: d.totalPersonalGoldReceivable ?? 0,
+    netGoldCapital: net,
+  };
+}
 
 @Component({
   selector: 'app-profit-widget',
@@ -22,16 +35,23 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
           <div>
             <h2 class="widget-title">Sermaye Özeti</h2>
             <p class="widget-subtitle">Anlık sermaye · Nakit bağlama: üstteki Hızlı Erişim</p>
+            @if (liveMid()) {
+              <p class="widget-rate-line">
+                @if (ratesFromManual()) {
+                  Manuel {{ liveMid() | number:'1.2-2' }} ₺/gr
+                } @else if (ratesFromDefault()) {
+                  Varsayılan {{ liveMid() | number:'1.2-2' }} ₺/gr
+                } @else {
+                  Canlı {{ liveMid() | number:'1.2-2' }} ₺/gr
+                }
+              </p>
+            } @else if (showHasRateNa()) {
+              <p class="widget-rate-line widget-rate-line--muted">Has kuru: N/A</p>
+            }
           </div>
         </div>
       </mat-card-header>
       <mat-card-content>
-        @if (loading()) {
-          <div class="loading-state">
-            <mat-icon class="spin">refresh</mat-icon>
-            Yükleniyor...
-          </div>
-        } @else if (capitalSummary()) {
           <div class="profit-display">
             <!-- Detaylar Grid -->
             <div class="details-grid">
@@ -42,7 +62,18 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
                 </div>
                 <div class="detail-content">
                   <span class="detail-label">Net Sermaye</span>
-                  <span class="detail-value">{{ capitalSummary()!.netGoldCapital | number:'1.2-2' }} Has Gr</span>
+                  <span class="detail-value">{{ capitalView()!.netGoldCapital | number:'1.2-2' }} Has Gr</span>
+                  @if (liveMid()) {
+                    <span class="detail-hint">
+                      @if (ratesFromManual()) {
+                        Manuel {{ liveMid() | number:'1.2-2' }} ₺/gr
+                      } @else if (ratesFromDefault()) {
+                        Varsayılan {{ liveMid() | number:'1.2-2' }} ₺/gr
+                      } @else {
+                        Canlı {{ liveMid() | number:'1.2-2' }} ₺/gr
+                      }
+                    </span>
+                  }
                 </div>
               </div>
 
@@ -53,7 +84,7 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
                 </div>
                 <div class="detail-content">
                   <span class="detail-label">Kasadaki Altın</span>
-                  <span class="detail-value">{{ capitalSummary()!.totalGoldInSafe | number:'1.2-2' }} Has Gr</span>
+                  <span class="detail-value">{{ capitalView()!.totalGoldInSafe | number:'1.2-2' }} Has Gr</span>
                 </div>
               </div>
 
@@ -64,7 +95,7 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
                 </div>
                 <div class="detail-content">
                   <span class="detail-label">Carilere Borç</span>
-                  <span class="detail-value">{{ capitalSummary()!.totalCustomerGoldDebt | number:'1.2-2' }} Has Gr</span>
+                  <span class="detail-value">{{ capitalView()!.totalCustomerGoldDebt | number:'1.2-2' }} Has Gr</span>
                 </div>
               </div>
 
@@ -75,17 +106,11 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
                 </div>
                 <div class="detail-content">
                   <span class="detail-label">Carilerden Alacak</span>
-                  <span class="detail-value">{{ capitalSummary()!.totalCustomerGoldReceivable | number:'1.2-2' }} Has Gr</span>
+                  <span class="detail-value">{{ capitalView()!.totalCustomerGoldReceivable | number:'1.2-2' }} Has Gr</span>
                 </div>
               </div>
             </div>
           </div>
-        } @else {
-          <div class="empty-state">
-            <mat-icon>insights</mat-icon>
-            <p>Veri yükleniyor...</p>
-          </div>
-        }
       </mat-card-content>
     </mat-card>
   `,
@@ -132,6 +157,18 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
       margin: 0.25rem 0 0 0;
       font-size: 0.875rem;
       color: rgba(255, 255, 255, 0.7);
+    }
+
+    .widget-rate-line {
+      margin: 0.35rem 0 0 0;
+      font-size: 0.78rem;
+      color: rgba(255, 255, 255, 0.85);
+      font-weight: 500;
+    }
+
+    .widget-rate-line--muted {
+      color: rgba(255, 255, 255, 0.6);
+      font-style: italic;
     }
 
     mat-card-content {
@@ -256,6 +293,14 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
       font-weight: 700;
     }
 
+    .detail-hint {
+      display: block;
+      margin-top: 0.35rem;
+      font-size: 0.7rem;
+      color: rgba(255, 255, 255, 0.75);
+      font-weight: 500;
+    }
+
     .empty-state {
       text-align: center;
       padding: 3rem 1rem;
@@ -286,34 +331,19 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
     }
   `]
 })
-export class ProfitWidgetComponent implements OnInit, OnDestroy {
-  private capitalService = inject(CapitalService);
-  private refreshService = inject(DashboardRefreshService);
-  private refreshSub?: Subscription;
+export class ProfitWidgetComponent {
+  dashboard = input.required<DashboardSummary>();
 
-  capitalSummary = signal<CapitalSummary | null>(null);
-  loading = signal(true);
+  capitalView = computed(() => capitalSummaryFromDashboard(this.dashboard()));
 
-  ngOnInit(): void {
-    this.loadData();
-    this.refreshSub = this.refreshService.refresh$.subscribe(() => this.loadData());
-  }
-
-  ngOnDestroy(): void {
-    this.refreshSub?.unsubscribe();
-  }
-
-  loadData(): void {
-    this.loading.set(true);
-    this.capitalService.getSummary().subscribe({
-      next: (data) => {
-        this.capitalSummary.set(data);
-        this.loading.set(false);
-      },
-      error: () => {
-        this.loading.set(false);
-      }
-    });
-  }
-
+  liveMid = computed(() => this.dashboard().liveHasTryPerGramMid ?? null);
+  ratesFromManual = computed(() => this.dashboard().ratesFromManualOverride === true);
+  ratesFromDefault = computed(() => this.dashboard().ratesFromDefaultFallback === true);
+  rateHintLabel = computed(() => {
+    const d = this.dashboard();
+    if (d.ratesFromManualOverride) return 'Manuel';
+    if (d.ratesFromDefaultFallback) return 'Varsayılan';
+    return 'Canlı';
+  });
+  showHasRateNa = computed(() => !this.dashboard().ratesAvailable && this.liveMid() == null);
 }

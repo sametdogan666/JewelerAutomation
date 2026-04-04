@@ -12,14 +12,12 @@ public interface IAccountingService
     decimal CalculateTotalLabour(int pieceCount, decimal unitLabour, bool subtract = false);
 
     /// <summary>
-    /// Has Gram (satış, işçilik dahil): (Miktar * Milyem / 1000) + Toplamİşçilik.
-    /// Excel: G = (B*C*0.001)+F
+    /// Has Gram (satış, işçilik dahil): saf has (gr×milyem, milyem ≤1 ondalık saflık; &gt;1 binlik ayar) + Toplamİşçilik.
     /// </summary>
     decimal CalculateHasGramWithLabour(decimal quantity, decimal milyem, decimal totalLabour);
 
     /// <summary>
-    /// Has Gram (sade, işçiliksiz): Miktar * Milyem / 1000.
-    /// Excel: Alış Has O = (M*N*0.001); Kasa D = B*C*0.001; Cari/Şahıs GR-HAS = (B*C*0.001)
+    /// Has Gram (sade, işçiliksiz): milyem ≤ 1 ise gr×milyem (ör. 0,916); aksi halde gr×milyem×0,001 (ör. 916).
     /// </summary>
     decimal CalculateHasGram(decimal quantity, decimal milyem);
 

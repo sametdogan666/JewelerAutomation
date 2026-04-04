@@ -11,6 +11,8 @@ public class UnitOfWork : IUnitOfWork
     public UnitOfWork(
         AppDbContext context,
         IUserRepository users,
+        IAuditLogRepository auditLogs,
+        IDailyGoldRateRepository dailyGoldRates,
         ICustomerRepository customers,
         ITransactionRepository transactions,
         ISafeMovementRepository safeMovements,
@@ -19,10 +21,13 @@ public class UnitOfWork : IUnitOfWork
         ICustomerTransactionRepository customerTransactions,
         ICashPeggingLogRepository cashPeggingLogs,
         ILedgerRepository ledger,
-        ICashToGoldConversionRepository cashToGoldConversions)
+        ICashToGoldConversionRepository cashToGoldConversions,
+        IProductTemplateRepository productTemplates)
     {
         _context = context;
         Users = users;
+        AuditLogs = auditLogs;
+        DailyGoldRates = dailyGoldRates;
         Customers = customers;
         Transactions = transactions;
         SafeMovements = safeMovements;
@@ -32,9 +37,12 @@ public class UnitOfWork : IUnitOfWork
         CashPeggingLogs = cashPeggingLogs;
         Ledger = ledger;
         CashToGoldConversions = cashToGoldConversions;
+        ProductTemplates = productTemplates;
     }
 
     public IUserRepository Users { get; }
+    public IAuditLogRepository AuditLogs { get; }
+    public IDailyGoldRateRepository DailyGoldRates { get; }
     public ICustomerRepository Customers { get; }
     public ITransactionRepository Transactions { get; }
     public ISafeMovementRepository SafeMovements { get; }
@@ -44,6 +52,7 @@ public class UnitOfWork : IUnitOfWork
     public ICashPeggingLogRepository CashPeggingLogs { get; }
     public ILedgerRepository Ledger { get; }
     public ICashToGoldConversionRepository CashToGoldConversions { get; }
+    public IProductTemplateRepository ProductTemplates { get; }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         => _context.SaveChangesAsync(cancellationToken);

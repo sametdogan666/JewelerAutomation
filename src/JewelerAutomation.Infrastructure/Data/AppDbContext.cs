@@ -9,6 +9,9 @@ public class AppDbContext : DbContext
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     public DbSet<User> Users => Set<User>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<DailyGoldRate> DailyGoldRates => Set<DailyGoldRate>();
+    public DbSet<GoldRate> GoldRates => Set<GoldRate>();
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<CustomerMovement> CustomerMovements => Set<CustomerMovement>();
     public DbSet<CustomerTransaction> CustomerTransactions => Set<CustomerTransaction>();
@@ -23,6 +26,7 @@ public class AppDbContext : DbContext
     public DbSet<LinkingProcess> LinkingProcesses => Set<LinkingProcess>();
     public DbSet<LinkingDetail> LinkingDetails => Set<LinkingDetail>();
     public DbSet<CashPeggingFifoDetail> CashPeggingFifoDetails => Set<CashPeggingFifoDetail>();
+    public DbSet<ProductTemplate> ProductTemplates => Set<ProductTemplate>();
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -132,10 +136,41 @@ public class AppDbContext : DbContext
             e.Property(x => x.Role).HasMaxLength(64);
         });
 
+        modelBuilder.Entity<AuditLog>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.UserName).HasMaxLength(256);
+            e.Property(x => x.EntityName).HasMaxLength(128);
+            e.Property(x => x.EntityId).HasMaxLength(96);
+            e.HasIndex(x => x.Timestamp);
+            e.HasIndex(x => new { x.EntityName, x.Timestamp });
+        });
+
+        modelBuilder.Entity<DailyGoldRate>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.AvgHasTryBuy).HasPrecision(18, 4);
+            e.Property(x => x.AvgHasTrySell).HasPrecision(18, 4);
+            e.Property(x => x.AvgHasTryMid).HasPrecision(18, 4);
+            e.Property(x => x.ClosingUsdTryMid).HasPrecision(18, 4);
+            e.HasIndex(x => new { x.BucketStartUtc, x.Kind }).IsUnique();
+        });
+
+        modelBuilder.Entity<GoldRate>(e =>
+        {
+            e.ToTable("GoldRates");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.HasTryPerGramMid).HasPrecision(18, 4);
+            e.Property(x => x.UsdTryMid).HasPrecision(18, 4);
+            e.Property(x => x.RecordedAtUtc).HasColumnName("SetAtUtc");
+            e.HasIndex(x => new { x.EffectiveDate, x.IsManual }).IsUnique();
+        });
+
         modelBuilder.Entity<Customer>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(256);
             e.Property(x => x.Phone).HasMaxLength(64);
+            e.HasIndex(x => x.IsActive);
         });
 
         modelBuilder.Entity<CustomerMovement>(e =>
@@ -161,7 +196,7 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<Transaction>(e =>
         {
-            e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
             e.HasMany(x => x.Items).WithOne(x => x.Transaction).HasForeignKey(x => x.TransactionId).OnDelete(DeleteBehavior.Cascade);
             e.Property(x => x.Quantity).HasPrecision(precision, scale);
             e.Property(x => x.Milyem).HasPrecision(precision, scale);
@@ -177,8 +212,21 @@ public class AppDbContext : DbContext
             e.HasIndex(x => x.CorrelationId);
         });
 
+        modelBuilder.Entity<ProductTemplate>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(256);
+            e.Property(x => x.MilyemSatis).HasPrecision(precision, scale);
+            e.Property(x => x.MilyemAlis).HasPrecision(precision, scale);
+            e.Property(x => x.DefaultGram).HasPrecision(precision, scale);
+            e.Property(x => x.DefaultLaborPrice).HasPrecision(18, 4);
+            e.Property(x => x.Category).HasMaxLength(128);
+            e.HasIndex(x => x.Name);
+        });
+
         modelBuilder.Entity<TransactionItem>(e =>
         {
+            e.HasOne(x => x.ProductTemplate).WithMany().HasForeignKey(x => x.ProductTemplateId)
+                .OnDelete(DeleteBehavior.SetNull);
             e.Property(x => x.Quantity).HasPrecision(precision, scale);
             e.Property(x => x.Milyem).HasPrecision(precision, scale);
             e.Property(x => x.TotalLabour).HasPrecision(precision, scale);

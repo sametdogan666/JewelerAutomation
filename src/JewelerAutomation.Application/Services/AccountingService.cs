@@ -32,14 +32,24 @@ public class AccountingService : IAccountingService
     /// <inheritdoc />
     public decimal CalculateHasGramWithLabour(decimal quantity, decimal milyem, decimal totalLabour)
     {
-        var hasFromPurity = quantity * milyem * MilyemFactor;
+        var hasFromPurity = GramAndMilyemToHasGram(quantity, milyem);
         return Math.Round(hasFromPurity + totalLabour, 6);
     }
 
     /// <inheritdoc />
     public decimal CalculateHasGram(decimal quantity, decimal milyem)
     {
-        return Math.Round(quantity * milyem * MilyemFactor, 6);
+        return GramAndMilyemToHasGram(quantity, milyem);
+    }
+
+    /// <summary>
+    /// Brüt gr × ayar → has gr. Milyem 0–1 aralığında ondalık saflık (0,916); üzerinde binlik (916) kabul edilir.
+    /// </summary>
+    private static decimal GramAndMilyemToHasGram(decimal gram, decimal milyem)
+    {
+        if (milyem <= 1m)
+            return Math.Round(gram * milyem, 6);
+        return Math.Round(gram * milyem * MilyemFactor, 6);
     }
 
     /// <inheritdoc />
