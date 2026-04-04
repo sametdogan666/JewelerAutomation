@@ -129,22 +129,14 @@
                   </mat-form-field>
                 </div>
                 <div class="col-pc">
-                  @if (isSaleItem($index)) {
-                    <mat-form-field appearance="outline" class="compact-field">
-                      <input matInput type="number" formControlName="pieceCount" min="0" />
-                    </mat-form-field>
-                  } @else {
-                    <span class="cell-na">—</span>
-                  }
+                  <mat-form-field appearance="outline" class="compact-field">
+                    <input matInput type="number" formControlName="pieceCount" min="0" />
+                  </mat-form-field>
                 </div>
                 <div class="col-ul">
-                  @if (isSaleItem($index)) {
-                    <mat-form-field appearance="outline" class="compact-field">
-                      <input matInput type="text" formControlName="unitLabour" mask="separator.2" thousandSeparator="." decimalMarker="," />
-                    </mat-form-field>
-                  } @else {
-                    <span class="cell-na">—</span>
-                  }
+                  <mat-form-field appearance="outline" class="compact-field">
+                    <input matInput type="text" formControlName="unitLabour" mask="separator.2" thousandSeparator="." decimalMarker="," />
+                  </mat-form-field>
                 </div>
                 <div class="col-price">
                   <mat-form-field appearance="outline" class="compact-field">

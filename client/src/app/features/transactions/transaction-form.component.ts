@@ -169,7 +169,7 @@ export class TransactionFormComponent implements OnInit {
           for (const item of tx.items) {
             this.addItem(item.direction, item.quantity, item.milyem,
               item.pieceCount ?? 0, item.unitLabour ?? 0,
-              item.price ?? 0, item.description ?? '');
+              item.price ?? 0, item.description ?? '', item.id);
           }
           if (tx.items.length === 0) {
             this.addItem();
@@ -190,9 +190,11 @@ export class TransactionFormComponent implements OnInit {
     pieceCount = 0,
     unitLabour = 0,
     price: number = 0,
-    description = ''
+    description = '',
+    itemId: string | null = null
   ): FormGroup {
     const g = this.fb.group({
+      itemId: [itemId],
       direction: [direction as TransactionDirection, Validators.required],
       quantity: [quantity, [Validators.required, Validators.min(0.001)]],
       milyem: [milyem, [Validators.required, Validators.min(0), Validators.max(1000)]],
@@ -212,10 +214,11 @@ export class TransactionFormComponent implements OnInit {
     pieceCount = 0,
     unitLabour = 0,
     price: number = 0,
-    description = ''
+    description = '',
+    itemId: string | null = null
   ): void {
     this.itemsArray.push(
-      this.createItemGroup(direction, quantity, milyem, pieceCount, unitLabour, price, description)
+      this.createItemGroup(direction, quantity, milyem, pieceCount, unitLabour, price, description, itemId)
     );
     this.syncSnapshot();
   }
@@ -234,17 +237,12 @@ export class TransactionFormComponent implements OnInit {
     const q = item.quantity ?? 0;
     const m = item.milyem ?? 0;
     let has = q * m * MILYEM_FACTOR;
-    if (item.direction === 0) {
-      const pc = item.pieceCount ?? 0;
-      const ul = item.unitLabour ?? 0;
-      const labour = -(pc * ul * LABOUR_FACTOR);
-      has += labour;
-    }
+    const rawPc = item.pieceCount;
+    const pcNum = typeof rawPc === 'number' ? rawPc : parseFloat(String(rawPc ?? '')) || 0;
+    const labourPieces = pcNum < 1 ? 1 : pcNum;
+    const ul = this.parseNum(item.unitLabour);
+    has += labourPieces * ul * LABOUR_FACTOR;
     return Math.round(has * 1e6) / 1e6;
-  }
-
-  isSaleItem(index: number): boolean {
-    return this.itemsArray.at(index)?.get('direction')?.value === 0;
   }
 
   parseNum(val: any): number {
@@ -301,7 +299,13 @@ export class TransactionFormComponent implements OnInit {
     const header = this.headerForm.getRawValue();
     const items: BasketItemCreate[] = this.itemsArray.controls.map(c => {
       const v = c.getRawValue();
+      const rawId = v.itemId as string | null | undefined;
+      const id =
+        this.editMode() && rawId && String(rawId).trim().length > 0
+          ? String(rawId).trim()
+          : undefined;
       return {
+        ...(id ? { id } : {}),
         direction: v.direction,
         quantity: v.quantity,
         milyem: v.milyem,

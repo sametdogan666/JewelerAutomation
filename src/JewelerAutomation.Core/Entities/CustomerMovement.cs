@@ -18,7 +18,7 @@ public class CustomerMovement : BaseEntity
     public decimal? UnitLabour { get; set; }
     /// <summary> Toplam İşçilik = ±(Adet * Birimİşçilik * 0.01) </summary>
     public decimal TotalLabour { get; set; }
-    /// <summary> Has Gram = (Miktar*Milyem/1000) + TotalLabour - decimal(18,6) </summary>
+    /// <summary> Has Gram = (Miktar*Milyem/1000) + TotalLabour (işçilik toplanır) — decimal(18,6) </summary>
     public decimal HasGram { get; set; }
     public string? Description { get; set; }
     /// <summary> VERİLDİ / ALINDI - Miktar > 0 => Verildi, Miktar < 0 => Alındı </summary>

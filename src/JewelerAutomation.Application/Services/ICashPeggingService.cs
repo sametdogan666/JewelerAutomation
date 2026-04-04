@@ -44,11 +44,9 @@ public interface ICashPeggingService
 }
 
 /// <summary>
-/// Period-based profit model (excludes physical gold inventory):
-///   transactionProfit  = totalSalesHasGram - totalPurchasesHasGram
-///   cashPeggingProfit  = periodCashBalance / goldPrice
-///   netProfitHasGram   = cashPeggingProfit - transactionProfit
-///   netProfitTL        = netProfitHasGram * goldPrice
+/// Dönem işlem açığı T = satış has − alış has. Kasada kalan nakit R, bu bağlamada kullanılan C.
+/// S = C/P + R/P (tüm kasa nakdinin seçilen fiyattaki has karşılığı). Kısmi bağlamada:
+///   toplam net = S − T; mühürlenen = E×(S−T)/S; bekleyen = R_h×(S−T)/S (S&gt;0).
 /// </summary>
 public record PeggingSimulationResult(
     decimal PeriodCashBalance,
@@ -57,8 +55,17 @@ public record PeggingSimulationResult(
     decimal TotalSalesHasGram,
     decimal TotalPurchasesHasGram,
     decimal TransactionProfitHasGram,
+    /// <summary>Kasadaki tüm nakit + bu bağlama hası ile T&apos;ye göre net (S − T).</summary>
     decimal NetProfitHasGram,
     decimal NetProfitTL,
     decimal SafeCashBalance,
-    decimal LedgerPeriodCashBalance
+    decimal LedgerPeriodCashBalance,
+    decimal RemainingSafeCashTl,
+    decimal RemainingCashAsHasGram,
+    decimal TotalCashCoverAsHasGram,
+    decimal UnbackedGoldDebtHasGram,
+    decimal RealizedNetProfitHasGram,
+    decimal RealizedNetProfitTl,
+    decimal PendingEstimatedNetHasGram,
+    decimal PendingEstimatedNetTl
 );

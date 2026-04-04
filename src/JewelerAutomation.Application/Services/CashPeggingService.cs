@@ -42,10 +42,10 @@ public class CashPeggingService : ICashPeggingService
 
         _logger.LogInformation(
             "Pegging: Sales={Sales}, Purchases={Purchases}, TxProfit={TxProfit}, " +
-            "CashEquiv={CashEquiv}, NetProfit={NetProfit} Has Gr, NetProfitTL={NetProfitTL}",
+            "CashEquiv={CashEquiv}, RealizedNet={Realized} Has Gr, TotalNet={TotalNet} Has Gr",
             simulation.TotalSalesHasGram, simulation.TotalPurchasesHasGram,
             simulation.TransactionProfitHasGram, simulation.CashEquivalentHasGram,
-            simulation.NetProfitHasGram, simulation.NetProfitTL);
+            simulation.RealizedNetProfitHasGram, simulation.NetProfitHasGram);
 
         var cashAmount = simulation.PeriodCashBalance;
         var equivalentHasGram = simulation.CashEquivalentHasGram;
@@ -57,7 +57,7 @@ public class CashPeggingService : ICashPeggingService
 
         try
         {
-            var netProfitHasGram = simulation.NetProfitHasGram;
+            var netProfitHasGram = simulation.RealizedNetProfitHasGram;
 
             var log = new CashPeggingLog
             {
@@ -172,8 +172,8 @@ public class CashPeggingService : ICashPeggingService
 
             _logger.LogInformation(
                 "Cash pegging committed: LogId={LogId}, CorrelationId={CorrId}, " +
-                "Cash={Cash} TL → Gold={Gold} Has Gr, Profit={Profit} Has Gr",
-                log.Id, correlationId, cashAmount, equivalentHasGram, netProfitHasGram);
+                "Cash={Cash} TL → Gold={Gold} Has Gr, RealizedProfit={Profit} Has Gr (totalNet={TotalNet})",
+                log.Id, correlationId, cashAmount, equivalentHasGram, netProfitHasGram, simulation.NetProfitHasGram);
 
             return log;
         }
@@ -392,19 +392,50 @@ public class CashPeggingService : ICashPeggingService
         }
 
         var cashEquivalentHas = goldPricePerGram > 0 ? cashAmount / goldPricePerGram : 0;
+        var remainingSafeTl = Math.Max(0, safeCash - cashAmount);
+        var remainingAsHas = goldPricePerGram > 0 ? remainingSafeTl / goldPricePerGram : 0m;
+        var totalCoverHas = cashEquivalentHas + remainingAsHas;
 
-        var netProfitHasGram = cashEquivalentHas - transactionProfitHas;
-        var netProfitTL = netProfitHasGram * goldPricePerGram;
+        var T = transactionProfitHas;
+        decimal netProfitHasGram;
+        decimal netProfitTL;
+        decimal realizedNetHasGram;
+        decimal realizedNetTl;
+        decimal pendingNetHasGram;
+        decimal pendingNetTl;
+        decimal unbackedDebtHas;
+
+        if (totalCoverHas <= 0.0000001m)
+        {
+            netProfitHasGram = cashEquivalentHas - T;
+            netProfitTL = Math.Round(netProfitHasGram * goldPricePerGram, 2);
+            realizedNetHasGram = netProfitHasGram;
+            realizedNetTl = netProfitTL;
+            pendingNetHasGram = 0;
+            pendingNetTl = 0;
+            unbackedDebtHas = Math.Max(0, T - cashEquivalentHas);
+        }
+        else
+        {
+            netProfitHasGram = totalCoverHas - T;
+            netProfitTL = Math.Round(netProfitHasGram * goldPricePerGram, 2);
+            realizedNetHasGram = Math.Round(cashEquivalentHas * (totalCoverHas - T) / totalCoverHas, 6);
+            pendingNetHasGram = Math.Round(remainingAsHas * (totalCoverHas - T) / totalCoverHas, 6);
+            realizedNetTl = Math.Round(realizedNetHasGram * goldPricePerGram, 2);
+            pendingNetTl = Math.Round(pendingNetHasGram * goldPricePerGram, 2);
+            unbackedDebtHas = Math.Max(0, T - totalCoverHas);
+        }
 
         _logger.LogInformation(
             "Simulate: Period={Start:yyyy-MM-dd} to {End:yyyy-MM-dd}, GoldPrice={Price}, " +
             "SalesHas={Sales}, PurchasesHas={Purchases}, TxProfit={TxProfit}, " +
-            "PegCash={Cash}, CashEquivHas={CashEquiv}, " +
-            "NetProfitHas={NetProfit}, NetProfitTL={NetTL}, GoldInSafe={Safe}",
+            "PegCash={Cash}, CashEquivHas={CashEquiv}, CoverHas={Cover}, " +
+            "NetHas={Net}, Realized={Real}, Pending={Pending}, Unbacked={Unbacked}, GoldInSafe={Safe}",
             periodStart, periodEnd, goldPricePerGram,
-            totalSalesHas, totalPurchasesHas, transactionProfitHas,
-            cashAmount, cashEquivalentHas,
-            netProfitHasGram, netProfitTL, totalBalances.TotalGoldBalance);
+            totalSalesHas, totalPurchasesHas, T,
+            cashAmount, cashEquivalentHas, totalCoverHas,
+            netProfitHasGram, realizedNetHasGram, pendingNetHasGram, unbackedDebtHas,
+            totalBalances.TotalGoldBalance);
 
         return new PeggingSimulationResult(
             PeriodCashBalance: cashAmount,
@@ -414,9 +445,17 @@ public class CashPeggingService : ICashPeggingService
             TotalPurchasesHasGram: Math.Round(totalPurchasesHas, 6),
             TransactionProfitHasGram: Math.Round(transactionProfitHas, 6),
             NetProfitHasGram: Math.Round(netProfitHasGram, 6),
-            NetProfitTL: Math.Round(netProfitTL, 2),
+            NetProfitTL: netProfitTL,
             SafeCashBalance: safeCash,
-            LedgerPeriodCashBalance: ledgerPeriodCash
+            LedgerPeriodCashBalance: ledgerPeriodCash,
+            RemainingSafeCashTl: Math.Round(remainingSafeTl, 2),
+            RemainingCashAsHasGram: Math.Round(remainingAsHas, 6),
+            TotalCashCoverAsHasGram: Math.Round(totalCoverHas, 6),
+            UnbackedGoldDebtHasGram: Math.Round(unbackedDebtHas, 6),
+            RealizedNetProfitHasGram: Math.Round(realizedNetHasGram, 6),
+            RealizedNetProfitTl: realizedNetTl,
+            PendingEstimatedNetHasGram: Math.Round(pendingNetHasGram, 6),
+            PendingEstimatedNetTl: pendingNetTl
         );
     }
 

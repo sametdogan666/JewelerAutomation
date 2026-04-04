@@ -132,8 +132,11 @@ import Swal from 'sweetalert2';
               </div>
               <div class="card-content">
                 <div class="fifo-open">
-                  <span class="fifo-open-label">Toplam Açık Has Pozisyonu</span>
-                  <span class="fifo-open-value">{{ openPositionGram() | number:'1.4-4' }} gr</span>
+                  <div class="fifo-open-row">
+                    <span class="fifo-open-label">Kapanmamış FIFO (hibrit sonrası tahmini)</span>
+                    <span class="fifo-open-value">{{ openPositionGram() | number:'1.4-4' }} gr</span>
+                  </div>
+                  <span class="fifo-open-sub">Dönem açığı (bağlama öncesi): {{ openPositionBeforeHybrid() | number:'1.4-4' }} gr</span>
                 </div>
                 <div class="form-row fifo-row" [formGroup]="fifoForm">
                   <mat-form-field appearance="outline">
@@ -235,14 +238,30 @@ import Swal from 'sweetalert2';
                 <div class="profit-card" [class.profit-card--gain]="result.netProfitHasGram >= 0" [class.profit-card--loss]="result.netProfitHasGram < 0">
                   <div class="profit-header">
                     <mat-icon class="profit-icon">{{ result.netProfitHasGram >= 0 ? 'trending_up' : 'trending_down' }}</mat-icon>
-                    <span class="profit-label">Dönem Net Kâr/Zarar</span>
+                    <span class="profit-label">Dönem net (kasadaki nakitle)</span>
                   </div>
                   <div class="profit-amount">
                     {{ result.netProfitHasGram >= 0 ? '+' : '' }}{{ result.netProfitHasGram | number:'1.2-2' }}
                   </div>
-                  <div class="profit-unit">Has Gr</div>
+                  <div class="profit-unit">Has Gr · tüm kasa fiyata göre</div>
                   <div class="profit-tl">
                     {{ result.netProfitTL >= 0 ? '+' : '' }}{{ result.netProfitTL | number:'1.2-2' }} ₺
+                  </div>
+                  <div class="profit-split">
+                    <div class="profit-split-row" [class.profit-split-row--gain]="result.realizedNetProfitHasGram >= 0" [class.profit-split-row--loss]="result.realizedNetProfitHasGram < 0">
+                      <span class="profit-split-label">Mühürlenen (bu bağlama)</span>
+                      <span class="profit-split-val">{{ result.realizedNetProfitHasGram >= 0 ? '+' : '' }}{{ result.realizedNetProfitHasGram | number:'1.2-2' }} Has · {{ result.realizedNetProfitTl >= 0 ? '+' : '' }}{{ result.realizedNetProfitTl | number:'1.2-2' }} ₺</span>
+                    </div>
+                    <div class="profit-split-row" [class.profit-split-row--gain]="result.pendingEstimatedNetHasGram >= 0" [class.profit-split-row--loss]="result.pendingEstimatedNetHasGram < 0">
+                      <span class="profit-split-label">Bekleyen (kalan {{ result.remainingSafeCashTl | number:'1.0-0' }} ₺)</span>
+                      <span class="profit-split-val">{{ result.pendingEstimatedNetHasGram >= 0 ? '+' : '' }}{{ result.pendingEstimatedNetHasGram | number:'1.2-2' }} Has · {{ result.pendingEstimatedNetTl >= 0 ? '+' : '' }}{{ result.pendingEstimatedNetTl | number:'1.2-2' }} ₺</span>
+                    </div>
+                    @if (result.unbackedGoldDebtHasGram > 0.0001) {
+                      <div class="profit-split-row profit-split-row--warn">
+                        <span class="profit-split-label">Nakitle karşılanmayan işlem açığı</span>
+                        <span class="profit-split-val">{{ result.unbackedGoldDebtHasGram | number:'1.2-2' }} Has Gr</span>
+                      </div>
+                    }
                   </div>
                 </div>
 
@@ -282,7 +301,7 @@ import Swal from 'sweetalert2';
                       <div class="info-content">
                         <div class="info-label">Bağlamada kullanılacak nakit</div>
                         <div class="info-value">{{ result.periodCashBalance | number:'1.2-2' }} ₺</div>
-                        <div class="info-hint">Kasada: {{ result.safeCashBalance | number:'1.2-2' }} ₺ · Defter dönem nakdi: {{ result.ledgerPeriodCashBalance | number:'1.2-2' }} ₺</div>
+                        <div class="info-hint">Kasada: {{ result.safeCashBalance | number:'1.2-2' }} ₺ · Bağlama sonrası kasada: {{ result.remainingSafeCashTl | number:'1.2-2' }} ₺ · Defter dönem nakdi: {{ result.ledgerPeriodCashBalance | number:'1.2-2' }} ₺</div>
                       </div>
                     </div>
 
@@ -523,11 +542,22 @@ import Swal from 'sweetalert2';
 
     .fifo-open {
       display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .fifo-open-row {
+      display: flex;
       justify-content: space-between;
       align-items: baseline;
-      margin-bottom: 0.75rem;
       gap: 0.5rem;
       flex-wrap: wrap;
+    }
+
+    .fifo-open-sub {
+      font-size: 0.75rem;
+      color: #6b7280;
     }
 
     .fifo-open-label {
@@ -895,6 +925,49 @@ import Swal from 'sweetalert2';
       opacity: 0.85;
     }
 
+    .profit-split {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.35);
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .profit-split-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      font-size: 0.78rem;
+      opacity: 0.95;
+    }
+
+    .profit-split-row--gain .profit-split-val {
+      color: rgba(255, 255, 255, 0.98);
+    }
+
+    .profit-split-row--loss .profit-split-val {
+      color: #fecaca;
+    }
+
+    .profit-split-row--warn .profit-split-val {
+      color: #fef08a;
+    }
+
+    .profit-split-label {
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      opacity: 0.85;
+      font-size: 0.65rem;
+    }
+
+    .profit-split-val {
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+
     /* ========== DETAILS CARD ========== */
     .details-card {
       background: #f9fafb;
@@ -1150,6 +1223,7 @@ export class ProfitAnalysisDialogComponent implements OnInit {
   });
 
   openPositionGram = signal(0);
+  openPositionBeforeHybrid = signal(0);
   fifoSim = signal<FifoLinkingSimulation | null>(null);
   fifoSaving = signal(false);
 
@@ -1237,7 +1311,8 @@ export class ProfitAnalysisDialogComponent implements OnInit {
       .subscribe({
         next: (r) => {
           this.simulationResult.set(r.hybrid);
-          this.openPositionGram.set(r.openHasPositionInPeriodGram);
+          this.openPositionBeforeHybrid.set(r.openHasPositionInPeriodGram);
+          this.openPositionGram.set(r.estimatedOpenHasAfterHybridGram ?? r.openHasPositionInPeriodGram);
           this.fifoSim.set(r.fifo);
           this.simulating.set(false);
         },
@@ -1353,15 +1428,18 @@ export class ProfitAnalysisDialogComponent implements OnInit {
     const sim = this.simulationResult();
     const price = this.simulationPrice();
     const cash = sim?.periodCashBalance ?? 0;
-    const profitG = sim?.netProfitHasGram ?? 0;
-    const profitSign = profitG >= 0 ? '+' : '';
+    const totalNet = sim?.netProfitHasGram ?? 0;
+    const realized = sim?.realizedNetProfitHasGram ?? totalNet;
+    const ts = totalNet >= 0 ? '+' : '';
+    const rs = realized >= 0 ? '+' : '';
 
     const confirm = await Swal.fire({
       title: 'Hibrit nakit bağlama',
       html:
         `<p>Toplam <strong>${cash.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} TL</strong> ` +
         `<strong>${price.toLocaleString('tr-TR')}</strong> TL/gr fiyatından hasa çevrilecek.</p>` +
-        `<p>Beklenen net kâr/zarar: <strong>${profitSign}${profitG.toFixed(2)}</strong> Has gr.</p>` +
+        `<p>Mühürlenen (bu tutar): <strong>${rs}${realized.toFixed(2)}</strong> Has gr.</p>` +
+        `<p>Kasadaki nakitle birlikte dönem neti: <strong>${ts}${totalNet.toFixed(2)}</strong> Has gr.</p>` +
         `<p>Onaylıyor musunuz?</p>`,
       icon: 'question',
       showCancelButton: true,
@@ -1387,11 +1465,11 @@ export class ProfitAnalysisDialogComponent implements OnInit {
 
           const cashStr = sim ? sim.periodCashBalance.toLocaleString('tr-TR', { maximumFractionDigits: 0 }) : '?';
           const hasStr = sim ? sim.cashEquivalentHasGram.toFixed(2) : '?';
-          const ps = (sim?.netProfitHasGram ?? 0) >= 0 ? '+' : '';
-          const profitStr = sim ? sim.netProfitHasGram.toFixed(2) : '?';
+          const rs = (sim?.realizedNetProfitHasGram ?? sim?.netProfitHasGram ?? 0) >= 0 ? '+' : '';
+          const realizedStr = sim ? (sim.realizedNetProfitHasGram ?? sim.netProfitHasGram).toFixed(2) : '?';
 
           this.snackBar.open(
-            `İşlem başarılı: ${cashStr} TL → ${hasStr} Has gr. Net: ${ps}${profitStr} gr.`,
+            `İşlem başarılı: ${cashStr} TL → ${hasStr} Has gr. Mühürlenmiş net: ${rs}${realizedStr} gr.`,
             'Tamam',
             { duration: 8000, panelClass: 'snackbar-success', horizontalPosition: 'center', verticalPosition: 'top' }
           );

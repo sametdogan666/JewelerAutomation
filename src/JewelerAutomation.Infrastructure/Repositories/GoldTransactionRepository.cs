@@ -69,6 +69,21 @@ public class GoldTransactionRepository : Repository<GoldTransaction>, IGoldTrans
             .ToListAsync(cancellationToken);
     }
 
+    public async Task DetachTransactionItemLinksForTransactionAsync(Guid transactionId, CancellationToken cancellationToken = default)
+    {
+        var rows = await Context.Set<GoldTransaction>()
+            .IgnoreQueryFilters()
+            .Where(g => g.TransactionId == transactionId && g.TransactionItemId != null)
+            .ToListAsync(cancellationToken);
+
+        var now = DateTime.UtcNow;
+        foreach (var g in rows)
+        {
+            g.TransactionItemId = null;
+            g.UpdatedAt = now;
+        }
+    }
+
     public async Task<bool> HasPartialLinkForTransactionAsync(Guid transactionId, CancellationToken cancellationToken = default)
     {
         return await Context.Set<GoldTransaction>()

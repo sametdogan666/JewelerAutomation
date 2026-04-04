@@ -67,7 +67,8 @@ public class ProfitAnalysisController : ControllerBase
                     r.Fifo.EstimatedProfitTl,
                     r.Fifo.OpenHasPositionGram,
                     r.Fifo.SufficientOpenPosition),
-            r.OpenHasPositionInPeriodGram));
+            r.OpenHasPositionInPeriodGram,
+            r.EstimatedOpenHasAfterHybridGram));
     }
 
     [HttpPost("peg-cash")]
@@ -204,7 +205,15 @@ public class ProfitAnalysisController : ControllerBase
         r.NetProfitHasGram,
         r.NetProfitTL,
         r.SafeCashBalance,
-        r.LedgerPeriodCashBalance
+        r.LedgerPeriodCashBalance,
+        r.RemainingSafeCashTl,
+        r.RemainingCashAsHasGram,
+        r.TotalCashCoverAsHasGram,
+        r.UnbackedGoldDebtHasGram,
+        r.RealizedNetProfitHasGram,
+        r.RealizedNetProfitTl,
+        r.PendingEstimatedNetHasGram,
+        r.PendingEstimatedNetTl
     );
 }
 
@@ -228,7 +237,8 @@ public record UnifiedPeggingSimulateApiRequest(
 public record UnifiedPeggingSimulationResponseDto(
     PeggingSimulationDto Hybrid,
     FifoLinkingSimulationResponseDto? Fifo,
-    decimal OpenHasPositionInPeriodGram);
+    decimal OpenHasPositionInPeriodGram,
+    decimal EstimatedOpenHasAfterHybridGram);
 
 public record FifoLinkingSimulationResponseDto(
     decimal TargetAmountGram,
@@ -261,7 +271,15 @@ public record PeggingSimulationDto(
     decimal NetProfitHasGram,
     decimal NetProfitTL,
     decimal SafeCashBalance,
-    decimal LedgerPeriodCashBalance
+    decimal LedgerPeriodCashBalance,
+    decimal RemainingSafeCashTl,
+    decimal RemainingCashAsHasGram,
+    decimal TotalCashCoverAsHasGram,
+    decimal UnbackedGoldDebtHasGram,
+    decimal RealizedNetProfitHasGram,
+    decimal RealizedNetProfitTl,
+    decimal PendingEstimatedNetHasGram,
+    decimal PendingEstimatedNetTl
 );
 
 public record CashPeggingLogDto(

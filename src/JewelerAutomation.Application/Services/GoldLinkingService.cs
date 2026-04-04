@@ -66,6 +66,8 @@ public class GoldLinkingService : IGoldLinkingService
 
     public async Task RemoveGoldTransactionsForTransactionAsync(Guid transactionId, CancellationToken cancellationToken = default)
     {
+        await _goldTransactions.DetachTransactionItemLinksForTransactionAsync(transactionId, cancellationToken).ConfigureAwait(false);
+
         var list = await _goldTransactions.GetByTransactionIdAsync(transactionId, cancellationToken).ConfigureAwait(false);
         foreach (var g in list)
             _goldTransactions.Remove(g);

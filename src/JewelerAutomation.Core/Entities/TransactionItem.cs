@@ -17,7 +17,7 @@ public class TransactionItem : BaseEntity
     public decimal Milyem { get; set; }
     public int? PieceCount { get; set; }
     public decimal? UnitLabour { get; set; }
-    /// <summary> ±(Adet * Birimİşçilik * 0.01) - decimal(18,6) </summary>
+    /// <summary> Adet × Birimİşçilik × 0.01 (has’a eklenen işçilik, gr) — decimal(18,6) </summary>
     public decimal TotalLabour { get; set; }
     /// <summary> Has Gram - decimal(18,6) </summary>
     public decimal HasGram { get; set; }
@@ -26,4 +26,7 @@ public class TransactionItem : BaseEntity
     public string? Description { get; set; }
     /// <summary> Milyem > 916 için (Milyem-916)*Miktar*0.001 - decimal(18,6) </summary>
     public decimal MilyemLabour { get; set; }
+
+    /// <summary>Satış kalemi için FIFO <see cref="GoldTransaction"/> satırları (Include/ThenInclude).</summary>
+    public ICollection<GoldTransaction> GoldTransactions { get; set; } = new List<GoldTransaction>();
 }

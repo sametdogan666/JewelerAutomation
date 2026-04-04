@@ -7,10 +7,9 @@ namespace JewelerAutomation.Application.Services;
 public interface IAccountingService
 {
     /// <summary>
-    /// Toplam İşçilik = ±(Adet * Birimİşçilik * 0.01).
-    /// Excel: F = -(D*E*0.01) veya (D*E*0.01)
+    /// Toplam İşçilik = ±(Adet * Birimİşçilik * 0.01). Varsayılan pozitif: Has = saf + işçilik.
     /// </summary>
-    decimal CalculateTotalLabour(int pieceCount, decimal unitLabour, bool subtract = true);
+    decimal CalculateTotalLabour(int pieceCount, decimal unitLabour, bool subtract = false);
 
     /// <summary>
     /// Has Gram (satış, işçilik dahil): (Miktar * Milyem / 1000) + Toplamİşçilik.

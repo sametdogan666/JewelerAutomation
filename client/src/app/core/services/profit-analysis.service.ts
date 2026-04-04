@@ -10,10 +10,19 @@ export interface PeggingSimulation {
   totalSalesHasGram: number;
   totalPurchasesHasGram: number;
   transactionProfitHasGram: number;
+  /** Kasadaki tüm nakit + bu bağlama ile T&apos;ye göre toplam net (S − T). */
   netProfitHasGram: number;
   netProfitTL: number;
   safeCashBalance: number;
   ledgerPeriodCashBalance: number;
+  remainingSafeCashTl: number;
+  remainingCashAsHasGram: number;
+  totalCashCoverAsHasGram: number;
+  unbackedGoldDebtHasGram: number;
+  realizedNetProfitHasGram: number;
+  realizedNetProfitTl: number;
+  pendingEstimatedNetHasGram: number;
+  pendingEstimatedNetTl: number;
 }
 
 export interface FifoLinkingSimulation {
@@ -28,6 +37,7 @@ export interface UnifiedPeggingSimulation {
   hybrid: PeggingSimulation;
   fifo: FifoLinkingSimulation | null;
   openHasPositionInPeriodGram: number;
+  estimatedOpenHasAfterHybridGram: number;
 }
 
 export interface CashPeggingLog {

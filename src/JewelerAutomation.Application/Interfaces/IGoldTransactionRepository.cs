@@ -30,6 +30,12 @@ public interface IGoldTransactionRepository : IRepository<GoldTransaction>
     Task<IReadOnlyList<GoldTransaction>> GetByTransactionIdAsync(Guid transactionId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Sepet kalemi yenilenmeden önce: tüm GoldTransactions satırlarında TransactionItemId FK’sını kaldırır
+    /// (soft delete ile kalem silinirken veritabanında FK ihlali oluşmasın diye).
+    /// </summary>
+    Task DetachTransactionItemLinksForTransactionAsync(Guid transactionId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// İşlemde kısmi bağlantı var mı (güncelleme/silme için).
     /// </summary>
     Task<bool> HasPartialLinkForTransactionAsync(Guid transactionId, CancellationToken cancellationToken = default);

@@ -23,7 +23,7 @@ public class AccountingService : IAccountingService
     }
 
     /// <inheritdoc />
-    public decimal CalculateTotalLabour(int pieceCount, decimal unitLabour, bool subtract = true)
+    public decimal CalculateTotalLabour(int pieceCount, decimal unitLabour, bool subtract = false)
     {
         var labour = (decimal)pieceCount * unitLabour * LabourFactor;
         return subtract ? -labour : labour;

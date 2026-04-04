@@ -39,6 +39,8 @@ export interface Transaction {
 }
 
 export interface BasketItemCreate {
+  /** Düzenlemede mevcut satırı eşlemek için (yeni satırda gönderilmez). */
+  id?: string;
   direction: TransactionDirection;
   quantity: number;
   milyem: number;

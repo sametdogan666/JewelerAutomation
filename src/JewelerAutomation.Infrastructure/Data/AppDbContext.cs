@@ -46,6 +46,8 @@ public class AppDbContext : DbContext
                 _ => null
             };
 
+            // Sepet güncellemede kasa/defter satırı silinirken CorrelationId null bırakılmazsa,
+            // aynı CorrelationId’li Transaction başlığı da cascade soft-delete olur.
             if (corrId.HasValue && corrId.Value != Guid.Empty)
                 correlationIdsToDelete.Add(corrId.Value);
         }
@@ -243,10 +245,14 @@ public class AppDbContext : DbContext
         const int linkPrecision = 18;
         const int linkScale = 4;
 
+        // GoldTransactions.TransactionItemId: DB’de ON DELETE SET NULL (soft-delete ile kalem satırı kalır).
+        // LinkingDetail / CashPeggingFifoDetail → GoldTransaction: CASCADE; sepet güncellemesinde GoldTransaction
+        // satırı fiziksel silindiğinde bağlı detaylar da silinebilir.
         modelBuilder.Entity<GoldTransaction>(e =>
         {
             e.HasOne(x => x.Transaction).WithMany().HasForeignKey(x => x.TransactionId).OnDelete(DeleteBehavior.Cascade);
-            e.HasOne(x => x.TransactionItem).WithMany().HasForeignKey(x => x.TransactionItemId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.TransactionItem).WithMany(x => x.GoldTransactions).HasForeignKey(x => x.TransactionItemId)
+                .OnDelete(DeleteBehavior.SetNull);
             e.Property(x => x.OriginalHasGram).HasPrecision(linkPrecision, linkScale);
             e.Property(x => x.RemainingGram).HasPrecision(linkPrecision, linkScale);
             e.HasIndex(x => x.TransactionId);
@@ -266,7 +272,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<LinkingDetail>(e =>
         {
             e.HasOne(x => x.LinkingProcess).WithMany(x => x.Details).HasForeignKey(x => x.LinkingProcessId).OnDelete(DeleteBehavior.Cascade);
-            e.HasOne(x => x.GoldTransaction).WithMany().HasForeignKey(x => x.GoldTransactionId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.GoldTransaction).WithMany().HasForeignKey(x => x.GoldTransactionId).OnDelete(DeleteBehavior.Cascade);
             e.Property(x => x.AmountDeducted).HasPrecision(linkPrecision, linkScale);
         });
 
@@ -275,7 +281,7 @@ public class AppDbContext : DbContext
             e.HasOne(x => x.CashPeggingLog).WithMany(x => x.FifoDetails).HasForeignKey(x => x.CashPeggingLogId)
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.GoldTransaction).WithMany().HasForeignKey(x => x.GoldTransactionId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.Cascade);
             e.Property(x => x.AmountDeducted).HasPrecision(linkPrecision, linkScale);
             e.HasIndex(x => x.CashPeggingLogId);
             e.HasIndex(x => x.GoldTransactionId);

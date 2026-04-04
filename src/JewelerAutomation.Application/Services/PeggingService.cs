@@ -160,6 +160,9 @@ public class PeggingService : IPeggingService
             request.PeriodEnd,
             cancellationToken).ConfigureAwait(false);
 
+        var eq = hybrid.CashEquivalentHasGram;
+        var estimatedOpenAfterHybrid = Math.Max(0, openInPeriod - Math.Min(openInPeriod, eq));
+
         FifoLinkingSimulationResult? fifo = null;
         if (request.FifoTargetAmountGram is > 0)
         {
@@ -171,7 +174,7 @@ public class PeggingService : IPeggingService
                 cancellationToken).ConfigureAwait(false);
         }
 
-        return new UnifiedPeggingSimulationDto(hybrid, fifo, openInPeriod);
+        return new UnifiedPeggingSimulationDto(hybrid, fifo, openInPeriod, estimatedOpenAfterHybrid);
     }
 
     public Task<CashPeggingLog> CreateHybridPeggingAsync(

@@ -36,4 +36,5 @@ public record UnifiedPeggingSimulateRequest(
 public record UnifiedPeggingSimulationDto(
     PeggingSimulationResult Hybrid,
     FifoLinkingSimulationResult? Fifo,
-    decimal OpenHasPositionInPeriodGram);
+    decimal OpenHasPositionInPeriodGram,
+    decimal EstimatedOpenHasAfterHybridGram);
