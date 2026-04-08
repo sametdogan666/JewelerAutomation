@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using JewelerAutomation.Application.Interfaces;
+using JewelerAutomation.Application.Utilities;
 using JewelerAutomation.Core.Entities;
 using JewelerAutomation.Infrastructure.Data;
 
@@ -28,15 +29,19 @@ public class SafeMovementRepository : ISafeMovementRepository
             .ToListAsync(cancellationToken);
 
     /// <summary>
-    /// Kasa bakiyesi: SUM(HasGram) - Excel'deki ANA SERMAYE (HAS-GR) = SUM(D3:D600)
-    /// </summary>
-    /// <summary>
-    /// Kasa hareketleri toplamı. ProfitRealization ledger'a yansımadığı için çift sayım önlenir (raporlama satırı).
+    /// Kasa hareketleri — imzalı fiziki toplam ile aynı mantık (geriye dönük uyumluluk).
     /// </summary>
     public async Task<decimal> GetTotalHasGramBalanceAsync(CancellationToken cancellationToken = default)
-        => await _context.SafeMovements
-            .Where(x => x.MovementType != SafeMovementType.ProfitRealization)
-            .SumAsync(x => x.HasGram, cancellationToken);
+        => await GetPhysicalVaultNetHasGramAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<decimal> GetPhysicalVaultNetHasGramAsync(CancellationToken cancellationToken = default)
+    {
+        var movements = await _context.SafeMovements
+            .AsNoTracking()
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return movements.Sum(SafeMovementPhysicalVault.GetSignedHasGramContribution);
+    }
 
     public async Task<Core.Entities.SafeMovement> AddAsync(Core.Entities.SafeMovement entity, CancellationToken cancellationToken = default)
     {

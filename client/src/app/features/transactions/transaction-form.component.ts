@@ -10,6 +10,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { DecimalPipe, DatePipe, NgClass } from '@angular/common';
 import { NgxMaskDirective } from 'ngx-mask';
 import {
@@ -18,6 +19,7 @@ import {
   BasketItemCreate,
   Transaction,
   TransactionDirection,
+  PaymentCurrency,
 } from '../../core/services/transactions.service';
 import { CustomersService, Customer } from '../../core/services/customers.service';
 import { DashboardService } from '../../core/services/dashboard.service';
@@ -33,6 +35,13 @@ const MILYEM_FACTOR = 0.001;
 const LABOUR_FACTOR = 0.01;
 
 type PriceInputMode = 'unit' | 'total';
+
+interface CashBucket {
+  try: number;
+  usd: number;
+  eur: number;
+  gbp: number;
+}
 
 interface ItemSummary {
   direction: 'Satış' | 'Alış';
@@ -59,6 +68,7 @@ interface ItemSummary {
     MatRadioModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
+    MatSlideToggleModule,
     DecimalPipe,
     DatePipe,
     NgClass,
@@ -100,6 +110,10 @@ export class TransactionFormComponent implements OnInit {
     transactionDate: [new Date().toISOString().slice(0, 10), Validators.required],
     description: [''],
     customerId: [null as string | null],
+    isSahisEmanet: [false],
+    /** 1 = emanet satış, 2 = emanet alış */
+    sahisEmanetMode: [1 as 1 | 2],
+    kasaHareketli: [true],
   });
 
   itemsArray = this.fb.array<FormGroup>([]);
@@ -110,35 +124,44 @@ export class TransactionFormComponent implements OnInit {
   totalBuy = computed(() => {
     const peg = this.nakitBaglamaDetail();
     if (peg) {
+      const cash: CashBucket = { try: peg.cash, usd: 0, eur: 0, gbp: 0 };
       return {
         hasGram: peg.equivalentHasGram,
-        cash: peg.cash,
+        cash,
       };
     }
     const items = this.itemsSnapshot();
-    let has = 0, cash = 0;
+    let has = 0;
+    const cash: CashBucket = { try: 0, usd: 0, eur: 0, gbp: 0 };
     for (const it of items) {
       if (it.direction === 1) {
         has += this.calcHasGram(it);
-        cash += this.effectiveLineTotalTl(it);
+        this.addCashToBucket(cash, it.paymentCurrency, this.effectiveLineTotalTl(it));
       }
     }
-    return { hasGram: Math.round(has * 1e6) / 1e6, cash: Math.round(cash * 100) / 100 };
+    return {
+      hasGram: Math.round(has * 1e6) / 1e6,
+      cash: this.roundCashBucket(cash),
+    };
   });
 
   totalSell = computed(() => {
     if (this.nakitBaglamaDetail()) {
-      return { hasGram: 0, cash: 0 };
+      return { hasGram: 0, cash: { try: 0, usd: 0, eur: 0, gbp: 0 } };
     }
     const items = this.itemsSnapshot();
-    let has = 0, cash = 0;
+    let has = 0;
+    const cash: CashBucket = { try: 0, usd: 0, eur: 0, gbp: 0 };
     for (const it of items) {
       if (it.direction === 0) {
         has += this.calcHasGram(it);
-        cash += this.effectiveLineTotalTl(it);
+        this.addCashToBucket(cash, it.paymentCurrency, this.effectiveLineTotalTl(it));
       }
     }
-    return { hasGram: Math.round(has * 1e6) / 1e6, cash: Math.round(cash * 100) / 100 };
+    return {
+      hasGram: Math.round(has * 1e6) / 1e6,
+      cash: this.roundCashBucket(cash),
+    };
   });
 
   netResult = computed(() => {
@@ -146,19 +169,44 @@ export class TransactionFormComponent implements OnInit {
     if (peg) {
       return {
         hasGram: peg.equivalentHasGram,
-        cash: Math.round(-peg.cash * 1000) / 1000,
+        cash: {
+          try: Math.round(-peg.cash * 1000) / 1000,
+          usd: 0,
+          eur: 0,
+          gbp: 0,
+        },
       };
     }
     const buy = this.totalBuy();
     const sell = this.totalSell();
     return {
       hasGram: Math.round((buy.hasGram - sell.hasGram) * 1e6) / 1e6,
-      cash: Math.round((sell.cash - buy.cash) * 100) / 100,
+      cash: {
+        try: Math.round((sell.cash.try - buy.cash.try) * 100) / 100,
+        usd: Math.round((sell.cash.usd - buy.cash.usd) * 100) / 100,
+        eur: Math.round((sell.cash.eur - buy.cash.eur) * 100) / 100,
+        gbp: Math.round((sell.cash.gbp - buy.cash.gbp) * 100) / 100,
+      },
     };
   });
 
   /** TL gösterimi: nakit bağlama özetinde daha fazla ondalık. */
   summaryCashDigits = computed(() => (this.nakitBaglamaDetail() ? '1.2-3' : '1.0-0'));
+
+  private addCashToBucket(bucket: CashBucket, cur: unknown, amount: number): void {
+    const c =
+      cur === 1 ? 'usd' : cur === 2 ? 'eur' : cur === 3 ? 'gbp' : 'try';
+    bucket[c] += amount;
+  }
+
+  private roundCashBucket(b: CashBucket): CashBucket {
+    return {
+      try: Math.round(b.try * 100) / 100,
+      usd: Math.round(b.usd * 100) / 100,
+      eur: Math.round(b.eur * 100) / 100,
+      gbp: Math.round(b.gbp * 100) / 100,
+    };
+  }
 
   ngOnInit(): void {
     this.loadReferenceHasMid();
@@ -180,6 +228,9 @@ export class TransactionFormComponent implements OnInit {
             transactionDate: new Date(tx.transactionDate).toISOString().slice(0, 10),
             description: tx.description ?? '',
             customerId: tx.customerId ?? null,
+            isSahisEmanet: tx.isSahisEmanet ?? false,
+            sahisEmanetMode: (tx.sahisEmanetMode === 2 ? 2 : 1) as 1 | 2,
+            kasaHareketli: tx.kasaHareketli !== false,
           });
 
           this.itemsArray.clear();
@@ -209,7 +260,8 @@ export class TransactionFormComponent implements OnInit {
               item.id,
               item.productTemplateId ?? null,
               lineTotal,
-              'total'
+              'total',
+              (item.paymentCurrency ?? 0) as PaymentCurrency
             );
           }
           if (tx.items.length === 0) {
@@ -222,6 +274,22 @@ export class TransactionFormComponent implements OnInit {
       this.addItem();
     }
     this.customersApi.getAll().subscribe((list) => this.customers.set(list));
+
+    this.headerForm.get('customerId')?.valueChanges.subscribe(() => {
+      if (!this.isSelectedCustomerSahis()) {
+        this.headerForm.patchValue(
+          { isSahisEmanet: false, sahisEmanetMode: 1, kasaHareketli: true },
+          { emitEvent: false }
+        );
+      }
+    });
+  }
+
+  isSelectedCustomerSahis(): boolean {
+    const id = this.headerForm.getRawValue().customerId;
+    if (!id) return false;
+    const c = this.customers().find((x) => x.id === id);
+    return c?.type === 1;
   }
 
   private loadReferenceHasMid(): void {
@@ -255,7 +323,8 @@ export class TransactionFormComponent implements OnInit {
     itemId: string | null = null,
     productTemplateId: string | null = null,
     lineTotalTl: number | null = null,
-    priceInputMode: PriceInputMode = 'unit'
+    priceInputMode: PriceInputMode = 'unit',
+    paymentCurrency: PaymentCurrency = 0
   ): FormGroup {
     const g = this.fb.group({
       itemId: [itemId],
@@ -268,6 +337,7 @@ export class TransactionFormComponent implements OnInit {
       price: [price as number | null],
       lineTotalTl: [lineTotalTl as number | null],
       priceInputMode: [priceInputMode],
+      paymentCurrency: [paymentCurrency as PaymentCurrency],
       description: [description],
     });
     g.get('direction')?.valueChanges.subscribe(() => this.applyRowRulesForDirection(g));
@@ -381,7 +451,8 @@ export class TransactionFormComponent implements OnInit {
     itemId: string | null = null,
     productTemplateId: string | null = null,
     lineTotalTl: number | null = null,
-    priceInputMode: PriceInputMode = 'unit'
+    priceInputMode: PriceInputMode = 'unit',
+    paymentCurrency: PaymentCurrency = 0
   ): void {
     this.itemsArray.push(
       this.createItemGroup(
@@ -395,7 +466,8 @@ export class TransactionFormComponent implements OnInit {
         itemId,
         productTemplateId,
         lineTotalTl,
-        priceInputMode
+        priceInputMode,
+        paymentCurrency
       )
     );
     this.syncSnapshot();
@@ -503,6 +575,22 @@ export class TransactionFormComponent implements OnInit {
     if (this.nakitBaglamaDetail() || this.itemsArray.length === 0 || this.saving()) return;
 
     const header = this.headerForm.getRawValue();
+    if (header.isSahisEmanet) {
+      if (!this.isSelectedCustomerSahis()) {
+        this.snackBar.open('Emanet sepeti için şahıs cari seçin.', 'Tamam', { duration: 5000 });
+        return;
+      }
+      const mode = header.sahisEmanetMode;
+      const snap = this.itemsSnapshot();
+      if (mode === 1 && snap.some((i) => Number(i['direction']) !== 0)) {
+        this.snackBar.open('Emanet satış: tüm kalemler satış olmalı.', 'Tamam', { duration: 5000 });
+        return;
+      }
+      if (mode === 2 && snap.some((i) => Number(i['direction']) !== 1)) {
+        this.snackBar.open('Emanet alış: tüm kalemler alış olmalı.', 'Tamam', { duration: 5000 });
+        return;
+      }
+    }
     const items: BasketItemCreate[] = this.itemsArray.controls.map((c) => {
       const v = c.getRawValue();
       const rawId = v.itemId as string | null | undefined;
@@ -525,14 +613,25 @@ export class TransactionFormComponent implements OnInit {
         lineTotal: mode === 'total' ? lt : undefined,
         description: v.description || undefined,
         productTemplateId: (v.productTemplateId as string | null) || undefined,
+        paymentCurrency: ((): PaymentCurrency => {
+          const pc = Math.round(Number(v.paymentCurrency ?? 0));
+          if (pc === 1) return 1;
+          if (pc === 2) return 2;
+          if (pc === 3) return 3;
+          return 0;
+        })(),
       };
     });
 
+    const emanet = header.isSahisEmanet && this.isSelectedCustomerSahis();
     const dto: BasketCreate = {
       transactionDate: new Date(header.transactionDate).toISOString(),
       description: header.description || undefined,
       customerId: header.customerId || undefined,
       items,
+      isSahisEmanet: emanet,
+      sahisEmanetMode: emanet ? header.sahisEmanetMode : 0,
+      kasaHareketli: header.kasaHareketli,
     };
 
     this.saving.set(true);

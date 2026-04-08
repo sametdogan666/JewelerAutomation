@@ -192,6 +192,13 @@
       color: #6a1b9a;
       font-size: 0.7rem;
     }
+
+    &--forex {
+      border-radius: 6px;
+      background: #e0f2f1;
+      color: #00695c;
+      font-size: 0.7rem;
+    }
   }
 
   .badge {
@@ -221,6 +228,34 @@
     background: linear-gradient(135deg, #ede7f6 0%, #e1bee7 100%);
     color: #4a148c;
     border: 1px solid #ce93d8;
+  }
+
+  .badge-forex {
+    background: linear-gradient(135deg, #e0f2f1 0%, #b2dfdb 100%);
+    color: #004d40;
+    border: 1px solid #4db6ac;
+  }
+
+  .net-cash-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.8125rem;
+    line-height: 1.35;
+  }
+
+  .net-cash-line {
+    font-weight: 600;
+    white-space: nowrap;
+
+    &--in {
+      color: #2e7d32;
+    }
+
+    &--out {
+      color: #c62828;
+    }
   }
 
   .peg-cash {
@@ -286,6 +321,14 @@
         background: linear-gradient(90deg, rgba(106, 27, 154, 0.1) 0%, #f8f9fa 100%);
       }
     }
+
+    &--forex {
+      background: linear-gradient(90deg, rgba(0, 105, 92, 0.06) 0%, transparent 100%);
+
+      &:hover {
+        background: linear-gradient(90deg, rgba(0, 105, 92, 0.1) 0%, #f8f9fa 100%);
+      }
+    }
   }
 }
 
@@ -314,6 +357,45 @@
   background: #fafbfc;
   border-top: 1px solid #e8eaed;
   border-bottom: 2px solid var(--primary);
+
+  &--forex {
+    border-bottom-color: #00897b;
+  }
+}
+
+.forex-detail-title {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: #004d40;
+  margin-bottom: var(--spacing-sm);
+}
+
+.forex-detail-dl {
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0;
+  font-size: 0.8125rem;
+
+  dt {
+    margin: 0;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.forex-detail-desc {
+  margin: var(--spacing-sm) 0 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-style: italic;
 }
 
 .detail-table {

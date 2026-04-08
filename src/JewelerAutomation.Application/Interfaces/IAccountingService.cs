@@ -1,4 +1,4 @@
-namespace JewelerAutomation.Application.Services;
+namespace JewelerAutomation.Application.Interfaces;
 
 /// <summary>
 /// Excel'deki formüllere dayalı kuyumculuk hesaplamaları (Has Gram, Milyem, İşçilik).
@@ -32,23 +32,23 @@ public interface IAccountingService
     /// Excel: I = IF(G=0,"BOŞ", IF(B>0,"VERİLDİ","ALINDI"))
     /// </summary>
     Core.Entities.MovementDirection GetMovementDirection(decimal quantity, decimal hasGram);
-    
+
     /// <summary>
     /// Kuyumculuk Kar/Zarar hesaplama (Nakit Bağlama Mantığı).
     /// Formula: Net Sermaye = (Kasadaki Nakit / Has Fiyatı) + Kasadaki Altın
     ///          Net Kar = Net Sermaye - Başlangıç Sermayesi
     /// </summary>
     Task<AccountingProfitResult> CalculateProfitAsync(
-        decimal goldPricePerGram, 
-        DateTime? startDate = null, 
-        DateTime? endDate = null, 
+        decimal goldPricePerGram,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
         CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// İlk "Ana Sermaye" (Capital) kasa hareketini bulur ve başlangıç sermayesi olarak döndürür.
     /// </summary>
     Task<decimal> GetInitialCapitalAsync(CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// Transaction'lardan toplam nakit bakiyesini hesaplar (Satış - Alış).
     /// </summary>

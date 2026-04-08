@@ -21,12 +21,12 @@
     <div class="basket-main">
       <!-- Header Card -->
       <mat-card class="section-card">
-        <mat-card-content>
+        <mat-card-content [formGroup]="headerForm">
           <h2 class="section-title">
             <mat-icon class="section-icon">calendar_today</mat-icon>
             Fatura Bilgileri
           </h2>
-          <div class="form-row form-row--3" [formGroup]="headerForm">
+          <div class="form-row form-row--3">
             <mat-form-field appearance="outline">
               <mat-label>Tarih</mat-label>
               <input matInput type="date" formControlName="transactionDate" />
@@ -45,6 +45,28 @@
               <input matInput formControlName="description" placeholder="İsteğe bağlı" />
             </mat-form-field>
           </div>
+          @if (!nakitBaglamaDetail()) {
+            <div class="form-row form-row--emanet">
+              <mat-slide-toggle formControlName="kasaHareketli" color="primary">
+                Kasa hareketli (fiziki kasa / deftere yaz)
+              </mat-slide-toggle>
+            </div>
+            @if (isSelectedCustomerSahis()) {
+              <div class="form-row form-row--emanet">
+                <mat-slide-toggle formControlName="isSahisEmanet" color="accent">
+                  Emanet işlemi (şahıs)
+                </mat-slide-toggle>
+              </div>
+              @if (headerForm.get('isSahisEmanet')?.value) {
+                <div class="form-row form-row--emanet-hint">
+                  <mat-radio-group formControlName="sahisEmanetMode" class="emanet-mode-group">
+                    <mat-radio-button [value]="1">Emanet satış — nakit girer, fiziki altın değişmez</mat-radio-button>
+                    <mat-radio-button [value]="2">Emanet alış — altın kasaya girer, nakit yok</mat-radio-button>
+                  </mat-radio-group>
+                </div>
+              }
+            }
+          }
         </mat-card-content>
       </mat-card>
 
@@ -76,9 +98,10 @@
               <div class="col-mil">Milyem</div>
               <div class="col-pc">Adet</div>
               <div class="col-ul">B. İşçilik</div>
-              <div class="col-price">Has ₺/gr</div>
+              <div class="col-cur">Para</div>
+              <div class="col-price">Birim</div>
               <div class="col-has">Has Gr</div>
-              <div class="col-linetl">Toplam ₺</div>
+              <div class="col-linetl">Toplam</div>
               <div class="col-desc">Açıklama</div>
               <div class="col-act"></div>
             </div>
@@ -94,6 +117,7 @@
                 <div class="col-mil pegging-cell"><span class="cell-na">—</span></div>
                 <div class="col-pc pegging-cell"><span class="cell-na">—</span></div>
                 <div class="col-ul pegging-cell"><span class="cell-na">—</span></div>
+                <div class="col-cur pegging-cell"><span class="cell-na">—</span></div>
                 <div class="col-price pegging-cell pegging-price-stack">
                   <span class="pegging-unit-price">{{ peg.goldPricePerGram | number:'1.2-2' }} ₺/gr</span>
                 </div>
@@ -158,6 +182,16 @@
                   [class.cell--purchase-inactive]="item.get('direction')?.value === 1">
                   <mat-form-field appearance="outline" class="compact-field">
                     <input matInput type="text" formControlName="unitLabour" mask="separator.2" thousandSeparator="." decimalMarker="," />
+                  </mat-form-field>
+                </div>
+                <div class="col-cur">
+                  <mat-form-field appearance="outline" class="compact-field">
+                    <mat-select formControlName="paymentCurrency">
+                      <mat-option [value]="0">TL</mat-option>
+                      <mat-option [value]="1">USD</mat-option>
+                      <mat-option [value]="2">EUR</mat-option>
+                      <mat-option [value]="3">GBP</mat-option>
+                    </mat-select>
                   </mat-form-field>
                 </div>
                 <div class="col-price">
@@ -269,9 +303,14 @@
               <span class="summary-label">Altın</span>
               <span class="summary-value">{{ totalBuy().hasGram | number:'1.2-2' }} gr</span>
             </div>
-            <div class="summary-row">
+            <div class="summary-row summary-row--cash-stack">
               <span class="summary-label">Nakit</span>
-              <span class="summary-value">{{ totalBuy().cash | number:summaryCashDigits() }} ₺</span>
+              <div class="summary-cash-stack">
+                <span class="summary-value">{{ totalBuy().cash.try | number:summaryCashDigits() }} ₺</span>
+                <span class="summary-value">{{ totalBuy().cash.usd | number:'1.2-2' }} USD</span>
+                <span class="summary-value">{{ totalBuy().cash.eur | number:'1.2-2' }} EUR</span>
+                <span class="summary-value">{{ totalBuy().cash.gbp | number:'1.2-2' }} GBP</span>
+              </div>
             </div>
           </div>
 
@@ -286,9 +325,14 @@
               <span class="summary-label">Altın</span>
               <span class="summary-value">{{ totalSell().hasGram | number:'1.2-2' }} gr</span>
             </div>
-            <div class="summary-row">
+            <div class="summary-row summary-row--cash-stack">
               <span class="summary-label">Nakit</span>
-              <span class="summary-value">{{ totalSell().cash | number:summaryCashDigits() }} ₺</span>
+              <div class="summary-cash-stack">
+                <span class="summary-value">{{ totalSell().cash.try | number:summaryCashDigits() }} ₺</span>
+                <span class="summary-value">{{ totalSell().cash.usd | number:'1.2-2' }} USD</span>
+                <span class="summary-value">{{ totalSell().cash.eur | number:'1.2-2' }} EUR</span>
+                <span class="summary-value">{{ totalSell().cash.gbp | number:'1.2-2' }} GBP</span>
+              </div>
             </div>
           </div>
 
@@ -306,12 +350,26 @@
                 {{ netResult().hasGram > 0 ? '+' : '' }}{{ netResult().hasGram | number:'1.2-2' }} gr
               </span>
             </div>
-            <div class="summary-row summary-row--highlight">
-              <span class="summary-label"><strong>Nakit (₺)</strong></span>
-              <span class="summary-value summary-value--large"
-                    [ngClass]="{'text-positive': netResult().cash > 0, 'text-negative': netResult().cash < 0}">
-                {{ netResult().cash > 0 ? '+' : '' }}{{ netResult().cash | number:summaryCashDigits() }} ₺
-              </span>
+            <div class="summary-row summary-row--highlight summary-row--cash-stack">
+              <span class="summary-label"><strong>Nakit (net)</strong></span>
+              <div class="summary-cash-stack summary-cash-stack--net">
+                <span class="summary-value summary-value--large"
+                      [ngClass]="{'text-positive': netResult().cash.try > 0, 'text-negative': netResult().cash.try < 0}">
+                  {{ netResult().cash.try > 0 ? '+' : '' }}{{ netResult().cash.try | number:summaryCashDigits() }} ₺
+                </span>
+                <span class="summary-value summary-value--large"
+                      [ngClass]="{'text-positive': netResult().cash.usd > 0, 'text-negative': netResult().cash.usd < 0}">
+                  {{ netResult().cash.usd > 0 ? '+' : '' }}{{ netResult().cash.usd | number:'1.2-2' }} USD
+                </span>
+                <span class="summary-value summary-value--large"
+                      [ngClass]="{'text-positive': netResult().cash.eur > 0, 'text-negative': netResult().cash.eur < 0}">
+                  {{ netResult().cash.eur > 0 ? '+' : '' }}{{ netResult().cash.eur | number:'1.2-2' }} EUR
+                </span>
+                <span class="summary-value summary-value--large"
+                      [ngClass]="{'text-positive': netResult().cash.gbp > 0, 'text-negative': netResult().cash.gbp < 0}">
+                  {{ netResult().cash.gbp > 0 ? '+' : '' }}{{ netResult().cash.gbp | number:'1.2-2' }} GBP
+                </span>
+              </div>
             </div>
           </div>
 

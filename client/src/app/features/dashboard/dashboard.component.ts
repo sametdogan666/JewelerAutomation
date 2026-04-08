@@ -60,10 +60,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     forkJoin({
       summary: this.dashboardService
         .getSummary()
-        .pipe(timeout(3000), catchError(() => of(null))),
+        .pipe(timeout(25000), catchError(() => of(null))),
       customers: this.customers
         .getAll()
-        .pipe(timeout(3000), catchError(() => of([] as Customer[]))),
+        .pipe(timeout(25000), catchError(() => of([] as Customer[]))),
     })
       .pipe(finalize(() => this.isLoading.set(false)))
       .subscribe(({ summary, customers }) => {
@@ -86,16 +86,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.dashboardService
       .getSummary()
       .pipe(
-        timeout(3000),
+        timeout(25000),
         catchError(() => of(null)),
         finalize(() => this.isLoading.set(false)),
       )
       .subscribe((s) => {
-        const next =
-          s != null && typeof s === 'object'
-            ? normalizeDashboardSummary(s)
-            : normalizeDashboardSummary(this.dashboardData());
-        this.dashboardData.set(next);
+        if (s != null && typeof s === 'object') {
+          this.dashboardData.set(normalizeDashboardSummary(s));
+        }
       });
   }
 

@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using JewelerAutomation.Application.Interfaces;
-using JewelerAutomation.Application.Services;
 using JewelerAutomation.Core.Entities;
 
 namespace JewelerAutomation.WebAPI.Controllers;
@@ -83,14 +82,22 @@ public class SafeController : ControllerBase
         return Ok(new SafeStatusDto(
             s.PhysicalGoldBalance,
             s.PhysicalCashBalance,
+            s.PhysicalCashBalanceUsd,
+            s.PhysicalCashBalanceEur,
+            s.PhysicalCashBalanceGbp,
             s.ExpectedGold,
             s.GoldGapOrSurplus,
             s.CustomerGoldDebt,
             s.CustomerGoldReceivable,
             s.PersonalGoldDebt,
             s.PersonalGoldReceivable,
+            s.SahisGoldLiabilitiesHasGram,
+            s.NetPhysicalEquityHasGram,
             s.NetGoldPosition,
             s.NetCashPosition,
+            s.NetCashPositionUsd,
+            s.NetCashPositionEur,
+            s.NetCashPositionGbp,
             s.ProfitHasGram,
             s.CumulativePeggingProfitHasGram,
             s.PeggingCount
@@ -176,14 +183,22 @@ public record SafeMovementCreateDto(DateTime TransactionDate, decimal Gram, deci
 public record SafeStatusDto(
     decimal PhysicalGoldBalance,
     decimal PhysicalCashBalance,
+    decimal PhysicalCashBalanceUsd,
+    decimal PhysicalCashBalanceEur,
+    decimal PhysicalCashBalanceGbp,
     decimal ExpectedGold,
     decimal GoldGapOrSurplus,
     decimal CustomerGoldDebt,
     decimal CustomerGoldReceivable,
     decimal PersonalGoldDebt,
     decimal PersonalGoldReceivable,
+    decimal SahisGoldLiabilitiesHasGram,
+    decimal NetPhysicalEquityHasGram,
     decimal NetGoldPosition,
     decimal NetCashPosition,
+    decimal NetCashPositionUsd,
+    decimal NetCashPositionEur,
+    decimal NetCashPositionGbp,
     decimal ProfitHasGram,
     decimal CumulativePeggingProfitHasGram,
     int PeggingCount

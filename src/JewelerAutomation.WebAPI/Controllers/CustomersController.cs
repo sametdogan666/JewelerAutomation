@@ -65,7 +65,6 @@ public class CustomersController : ControllerBase
         entity.Address = dto.Address;
         entity.Type = dto.Type;
         entity.Description = dto.Description;
-        entity.UpdatedAt = DateTime.UtcNow;
         _unitOfWork.Customers.Update(entity);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return NoContent();

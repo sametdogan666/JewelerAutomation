@@ -5,7 +5,9 @@ namespace JewelerAutomation.Application.Interfaces;
 public interface ILedgerRepository : IRepository<LedgerEntry>
 {
     Task<decimal> GetGoldBalanceAsync(CancellationToken cancellationToken = default);
+    /// <summary>Net kasa nakiti yalnızca <see cref="CashCurrency.Try"/> (TL) satırlarında.</summary>
     Task<decimal> GetCashBalanceAsync(CancellationToken cancellationToken = default);
+    Task<decimal> GetCashBalanceForCurrencyAsync(CashCurrency currency, CancellationToken cancellationToken = default);
     Task<decimal> GetGoldBalanceByPeriodAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
     Task<decimal> GetCashBalanceByPeriodAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
     Task<decimal> GetGoldBalanceByCustomerAsync(Guid customerId, CancellationToken cancellationToken = default);

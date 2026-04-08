@@ -25,8 +25,11 @@ public class TransactionItem : BaseEntity
     public decimal TotalLabour { get; set; }
     /// <summary> Has Gram - decimal(18,6) </summary>
     public decimal HasGram { get; set; }
-    /// <summary> Toplam tutar (TL) - decimal(18,6) </summary>
+    /// <summary> Satır nakit tutarı, <see cref="PaymentCurrency"/> biriminde - decimal(18,6) </summary>
     public decimal? Price { get; set; }
+
+    /// <summary>Nakit ödemenin para birimi (varsayılan TL).</summary>
+    public CashCurrency PaymentCurrency { get; set; }
     public string? Description { get; set; }
     /// <summary> Milyem > 916 için (Milyem-916)*Miktar*0.001 - decimal(18,6) </summary>
     public decimal MilyemLabour { get; set; }

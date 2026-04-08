@@ -67,8 +67,29 @@ export class ThermalReceiptService {
     return tx.id.replace(/-/g, '').slice(0, 10).toUpperCase();
   }
 
+  private isForex(tx: Transaction): boolean {
+    return (tx.kind ?? 0) === 1;
+  }
+
   private isNakitBaglama(tx: Transaction): boolean {
+    if (this.isForex(tx)) return false;
     return !!tx.correlationId && (!tx.items || tx.items.length === 0);
+  }
+
+  private forexBaseCode(tx: Transaction): string {
+    const c = tx.forexBaseCurrency;
+    if (c === 1) return 'USD';
+    if (c === 2) return 'EUR';
+    if (c === 3) return 'GBP';
+    return '';
+  }
+
+  private forexBaseSymbol(tx: Transaction): string {
+    const c = tx.forexBaseCurrency;
+    if (c === 1) return '$';
+    if (c === 2) return '€';
+    if (c === 3) return '£';
+    return '';
   }
 
   private formatMoney(n: number): string {
@@ -100,6 +121,13 @@ export class ThermalReceiptService {
 
   private directionTr(d: number): string {
     return d === 0 ? 'Satış' : 'Alış';
+  }
+
+  private currencySuffix(paymentCurrency?: number): string {
+    if (paymentCurrency === 1) return 'USD';
+    if (paymentCurrency === 2) return 'EUR';
+    if (paymentCurrency === 3) return 'GBP';
+    return '₺';
   }
 
   private buildReceiptElement(tx: Transaction): HTMLDivElement {
@@ -143,7 +171,24 @@ export class ThermalReceiptService {
       root.appendChild(d);
     }
 
-    if (this.isNakitBaglama(tx)) {
+    if (this.isForex(tx)) {
+      const code = this.forexBaseCode(tx);
+      const sym = this.forexBaseSymbol(tx);
+      const buy = tx.forexIsBuy === true;
+      const amt = Number(tx.forexAmountBase ?? 0);
+      const rate = Number(tx.forexRateTryPerUnit ?? 0);
+      const ctr = Number(tx.forexCounterTry ?? 0);
+      const block = document.createElement('div');
+      block.style.cssText =
+        'border:1px solid #00897b;padding:8px;margin-bottom:10px;font-size:10px;background:#e0f2f1;';
+      block.innerHTML = `
+        <div style="font-weight:700;margin-bottom:6px;color:#004d40;">Döviz işlemi</div>
+        <div>${buy ? 'Alış' : 'Satış'} · ${this.formatMoney(amt)} ${this.escapeHtml(code)} (${this.escapeHtml(sym)})</div>
+        <div>Kur: ${this.formatMoney(rate)} ₺ / 1 ${this.escapeHtml(code)}</div>
+        <div>TRY karşılığı: <strong>${buy ? '−' : '+'}${this.formatMoney(ctr)} ₺</strong></div>
+      `;
+      root.appendChild(block);
+    } else if (this.isNakitBaglama(tx)) {
       const peg = this.peggingLines(tx);
       const block = document.createElement('div');
       block.style.cssText = 'border:1px dashed #999;padding:8px;margin-bottom:10px;font-size:10px;';
@@ -167,7 +212,7 @@ export class ThermalReceiptService {
             <th style="text-align:left;padding:4px 2px;font-weight:600;">Ürün</th>
             <th style="text-align:right;padding:4px 2px;font-weight:600;width:44px;">Gr</th>
             <th style="text-align:right;padding:4px 2px;font-weight:600;width:48px;">Mil.</th>
-            <th style="text-align:right;padding:4px 2px;font-weight:600;width:56px;">₺</th>
+            <th style="text-align:right;padding:4px 2px;font-weight:600;width:56px;">Tutar</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -178,6 +223,7 @@ export class ThermalReceiptService {
         const tr = document.createElement('tr');
         tr.style.cssText = 'border-bottom:1px dotted #ccc;vertical-align:top;';
         const totalTl = it.price ?? 0;
+        const cur = this.currencySuffix(it.paymentCurrency);
         tr.innerHTML = `
           <td style="padding:6px 2px;">
             <div style="font-weight:500;">${this.escapeHtml(this.itemLabel(it))}</div>
@@ -185,7 +231,7 @@ export class ThermalReceiptService {
           </td>
           <td style="padding:6px 2px;text-align:right;white-space:nowrap;">${this.formatGram(it.quantity)}</td>
           <td style="padding:6px 2px;text-align:right;white-space:nowrap;">${this.formatMilyem(it.milyem)}</td>
-          <td style="padding:6px 2px;text-align:right;white-space:nowrap;font-weight:600;">${this.formatMoney(totalTl)}</td>
+          <td style="padding:6px 2px;text-align:right;white-space:nowrap;font-weight:600;">${this.formatMoney(totalTl)} ${cur}</td>
         `;
         tbody.appendChild(tr);
       }
@@ -196,15 +242,30 @@ export class ThermalReceiptService {
     totals.style.cssText =
       'border-top:2px solid #111;padding-top:10px;margin-top:4px;font-size:11px;';
     const netHas = tx.netHasGram;
-    const netCash = tx.netCashAmount;
+    const netTry = tx.netCashAmount ?? 0;
+    const netUsd = tx.netCashAmountUsd ?? 0;
+    const netEur = tx.netCashAmountEur ?? 0;
+    const netGbp = tx.netCashAmountGbp ?? 0;
     totals.innerHTML = `
       <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
         <span>Toplam Has (net)</span>
         <strong>${this.formatGram(netHas)} gr</strong>
       </div>
       <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
-        <span>Toplam Nakit (net)</span>
-        <strong>${this.formatMoney(netCash)} ₺</strong>
+        <span>Nakit net</span>
+        <strong>${this.formatMoney(netTry)} ₺</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+        <span>Nakit net</span>
+        <strong>${this.formatMoney(netUsd)} $</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+        <span>Nakit net</span>
+        <strong>${this.formatMoney(netEur)} €</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+        <span>Nakit net</span>
+        <strong>${this.formatMoney(netGbp)} £</strong>
       </div>
     `;
     root.appendChild(totals);

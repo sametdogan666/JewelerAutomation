@@ -1,4 +1,4 @@
-namespace JewelerAutomation.Application.Services;
+namespace JewelerAutomation.Application.Interfaces;
 
 public enum CustomerDeleteResult
 {

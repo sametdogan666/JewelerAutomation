@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using JewelerAutomation.Application.Services;
+using JewelerAutomation.Application.Interfaces;
 using JewelerAutomation.Core;
 using JewelerAutomation.Core.Entities;
 

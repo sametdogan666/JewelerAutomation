@@ -12,7 +12,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
-import { TransactionsService, Transaction, TransactionDirection } from '../../core/services/transactions.service';
+import { TransactionsService, Transaction, TransactionKind } from '../../core/services/transactions.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { DashboardRefreshService } from '../../core/services/dashboard-refresh.service';
 import { ThermalReceiptService } from '../../core/services/thermal-receipt.service';
@@ -117,9 +117,71 @@ export class TransactionsListComponent implements OnInit {
     this.dateFilterType.setValue('all');
   }
 
+  /** Saf döviz (Borsa) — altın yok. */
+  isForexRow(tx: Transaction): boolean {
+    return (tx.kind as TransactionKind | undefined) === 1;
+  }
+
   /** Nakit bağlama kaydı: CorrelationId + sepet kalemi yok (sistem işlemi). */
   isNakitBaglamaRow(tx: Transaction): boolean {
+    if (this.isForexRow(tx)) return false;
     return !!tx.correlationId && (!tx.items || tx.items.length === 0);
+  }
+
+  private fmtCash(n: number): string {
+    return Math.abs(n).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+  /** Liste hücresi: ayrı para birimleri, sembol ile (karıştırılmaz). */
+  netCashLines(tx: Transaction): string[] {
+    if (this.isNakitBaglamaRow(tx)) return [];
+    const lines: string[] = [];
+    const push = (v: number | undefined, sym: string) => {
+      const x = Number(v ?? 0);
+      if (Math.abs(x) < 1e-9) return;
+      const sign = x > 0 ? '+' : '−';
+      lines.push(`${sign}${this.fmtCash(x)} ${sym}`);
+    };
+    push(tx.netCashAmount, '₺');
+    push(tx.netCashAmountUsd, '$');
+    push(tx.netCashAmountEur, '€');
+    push(tx.netCashAmountGbp, '£');
+    return lines;
+  }
+
+  hasAnyNetCash(tx: Transaction): boolean {
+    return this.netCashLines(tx).length > 0;
+  }
+
+  /** Genişletilebilir: döviz özeti veya sepet kalemleri. */
+  hasExpandableDetail(tx: Transaction): boolean {
+    return this.isForexRow(tx) || (tx.items?.length ?? 0) > 0;
+  }
+
+  netCashLineClass(line: string): string {
+    if (line.startsWith('+')) return 'net-cash-line net-cash-line--in';
+    if (line.startsWith('−') || line.startsWith('-')) return 'net-cash-line net-cash-line--out';
+    return 'net-cash-line';
+  }
+
+  forexBaseCode(tx: Transaction): string {
+    const c = tx.forexBaseCurrency;
+    if (c === 1) return 'USD';
+    if (c === 2) return 'EUR';
+    if (c === 3) return 'GBP';
+    return '—';
+  }
+
+  forexBaseSymbol(tx: Transaction): string {
+    const c = tx.forexBaseCurrency;
+    if (c === 1) return '$';
+    if (c === 2) return '€';
+    if (c === 3) return '£';
+    return '';
+  }
+
+  forexActionTr(tx: Transaction): string {
+    return tx.forexIsBuy ? 'Alış' : 'Satış';
   }
 
   /**
@@ -148,6 +210,7 @@ export class TransactionsListComponent implements OnInit {
   }
 
   netLabel(tx: Transaction): string {
+    if (this.isForexRow(tx)) return 'Döviz İşlemi';
     if (this.isNakitBaglamaRow(tx)) return 'Nakit Bağlama';
     if (tx.netHasGram > 0) return 'Alış (Net)';
     if (tx.netHasGram < 0) return 'Satış (Net)';
@@ -155,13 +218,21 @@ export class TransactionsListComponent implements OnInit {
   }
 
   itemCountLabel(tx: Transaction): string {
-    if (this.isNakitBaglamaRow(tx)) return '—';
+    if (this.isForexRow(tx) || this.isNakitBaglamaRow(tx)) return '—';
     const n = tx.items?.length ?? 0;
     return n > 0 ? String(n) : '1';
   }
 
   formatDate(s: string): string {
-    return new Date(s).toLocaleDateString('tr-TR');
+    return new Date(s).toLocaleString('tr-TR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
   }
 
   toggleExpand(tx: Transaction): void {

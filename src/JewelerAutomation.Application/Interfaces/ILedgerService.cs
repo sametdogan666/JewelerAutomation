@@ -1,6 +1,6 @@
 using JewelerAutomation.Core.Entities;
 
-namespace JewelerAutomation.Application.Services;
+namespace JewelerAutomation.Application.Interfaces;
 
 public record LedgerBalances(
     decimal TotalGoldBalance,
@@ -26,6 +26,32 @@ public interface ILedgerService
         Guid? customerId,
         string? description,
         Guid? correlationId = null,
+        CashCurrency cashCurrency = CashCurrency.Try,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Kasada bir para biriminden çıkış, diğerine giriş (aynı <paramref name="referenceId"/> ile eşlenir).</summary>
+    Task RecordCurrencyExchangeAsync(
+        DateTime transactionDate,
+        CashCurrency sellCurrency,
+        decimal sellAmount,
+        CashCurrency buyCurrency,
+        decimal buyAmount,
+        Guid referenceId,
+        string? description,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Döviz ↔ TRY: <paramref name="isBuy"/> true iken kasadan TRY çıkar, döviz girer; false iken tersi.
+    /// <paramref name="baseCurrency"/> USD/EUR/GBP olmalıdır. Defter <see cref="LedgerReferenceType.Transaction"/> ile işlem Id’sine bağlanır.
+    /// </summary>
+    Task RecordForexTradeAgainstTryAsync(
+        DateTime transactionDate,
+        CashCurrency baseCurrency,
+        bool isBuy,
+        decimal amountBase,
+        decimal counterTryAbs,
+        Guid referenceId,
+        string? description,
         CancellationToken cancellationToken = default);
 
     Task RecordCustomerTransactionAsync(
@@ -36,6 +62,26 @@ public interface ILedgerService
         Guid customerId,
         Guid referenceId,
         string? description,
+        CashCurrency cashCurrency = CashCurrency.Try,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Kasaya yalnız nakit girişi (şahıs emanet satışı vb.).</summary>
+    Task RecordShopCashInAsync(
+        DateTime transactionDate,
+        decimal cashAmount,
+        CashCurrency cashCurrency,
+        Guid referenceId,
+        string? description,
+        Guid? correlationId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Kasaya yalnız has altın girişi (şahıs emanet alışı).</summary>
+    Task RecordShopGoldInAsync(
+        DateTime transactionDate,
+        decimal goldHasAmount,
+        Guid referenceId,
+        string? description,
+        Guid? correlationId,
         CancellationToken cancellationToken = default);
 
     Task RecordSafeMovementAsync(
@@ -52,6 +98,7 @@ public interface ILedgerService
         decimal goldHasAmount,
         Guid referenceId,
         string? description,
+        CashCurrency cashCurrency = CashCurrency.Try,
         CancellationToken cancellationToken = default);
 
     Task RecordCashToGoldConversionAsync(
@@ -61,6 +108,7 @@ public interface ILedgerService
         Guid referenceId,
         Guid? customerId,
         string? description,
+        CashCurrency cashCurrency = CashCurrency.Try,
         CancellationToken cancellationToken = default);
 
     /// <summary>FIFO nakit bağlama: kasadan nakit çıkış + satın alınan has altın girişi.</summary>
@@ -70,6 +118,7 @@ public interface ILedgerService
         decimal goldHasAmount,
         Guid linkingProcessId,
         string? description,
+        CashCurrency cashCurrency = CashCurrency.Try,
         CancellationToken cancellationToken = default);
 
     Task<LedgerBalances> GetBalancesAsync(CancellationToken cancellationToken = default);

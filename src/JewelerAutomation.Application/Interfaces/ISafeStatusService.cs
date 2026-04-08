@@ -15,6 +15,9 @@ public record SafeStatus(
     // Physical Balance (Brüt Kasa)
     decimal PhysicalGoldBalance,
     decimal PhysicalCashBalance,
+    decimal PhysicalCashBalanceUsd,
+    decimal PhysicalCashBalanceEur,
+    decimal PhysicalCashBalanceGbp,
 
     // Gold Gap / Surplus
     decimal ExpectedGold,
@@ -25,8 +28,13 @@ public record SafeStatus(
     decimal CustomerGoldReceivable,
     decimal PersonalGoldDebt,
     decimal PersonalGoldReceivable,
+    decimal SahisGoldLiabilitiesHasGram,
+    decimal NetPhysicalEquityHasGram,
     decimal NetGoldPosition,
     decimal NetCashPosition,
+    decimal NetCashPositionUsd,
+    decimal NetCashPositionEur,
+    decimal NetCashPositionGbp,
 
     // Profit (reporting-only metric)
     decimal ProfitHasGram,

@@ -4,12 +4,6 @@ using Microsoft.Extensions.Logging;
 
 namespace JewelerAutomation.Application.Services;
 
-public interface ILedgerMigrationService
-{
-    Task MigrateExistingDataToLedgerAsync(CancellationToken cancellationToken = default);
-    Task RebuildLedgerAsync(CancellationToken cancellationToken = default);
-}
-
 public class LedgerMigrationService : ILedgerMigrationService
 {
     private readonly IUnitOfWork _unitOfWork;
@@ -127,6 +121,10 @@ public class LedgerMigrationService : ILedgerMigrationService
 
         foreach (var ctx in customerTransactions)
         {
+            if (!ctx.PostToLedger)
+                continue;
+            if (ctx.TransactionType is CustomerTransactionType.OpeningBalance or CustomerTransactionType.SahisEmanetLiability)
+                continue;
             await _ledgerService.RecordCustomerTransactionAsync(
                 transactionDate: ctx.TransactionDate,
                 transactionType: ctx.TransactionType,
@@ -135,6 +133,7 @@ public class LedgerMigrationService : ILedgerMigrationService
                 customerId: ctx.CustomerId,
                 referenceId: ctx.Id,
                 description: ctx.Description,
+                cashCurrency: ctx.CashCurrency,
                 cancellationToken: cancellationToken
             );
             migratedCount++;

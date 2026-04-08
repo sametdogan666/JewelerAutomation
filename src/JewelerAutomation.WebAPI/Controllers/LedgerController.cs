@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using JewelerAutomation.Application.Services;
 using JewelerAutomation.Application.Interfaces;
 using JewelerAutomation.Core.Entities;
 

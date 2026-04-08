@@ -24,14 +24,17 @@ public class LedgerRepository : Repository<LedgerEntry>, ILedgerRepository
         return goldIn - goldOut;
     }
 
-    public async Task<decimal> GetCashBalanceAsync(CancellationToken cancellationToken = default)
+    public Task<decimal> GetCashBalanceAsync(CancellationToken cancellationToken = default)
+        => GetCashBalanceForCurrencyAsync(CashCurrency.Try, cancellationToken);
+
+    public async Task<decimal> GetCashBalanceForCurrencyAsync(CashCurrency currency, CancellationToken cancellationToken = default)
     {
         var cashIn = await Context.LedgerEntries
-            .Where(e => e.EntryType == LedgerEntryType.CashIn)
+            .Where(e => e.EntryType == LedgerEntryType.CashIn && e.CashCurrency == currency)
             .SumAsync(e => e.CashAmount, cancellationToken);
 
         var cashOut = await Context.LedgerEntries
-            .Where(e => e.EntryType == LedgerEntryType.CashOut)
+            .Where(e => e.EntryType == LedgerEntryType.CashOut && e.CashCurrency == currency)
             .SumAsync(e => e.CashAmount, cancellationToken);
 
         return cashIn - cashOut;
@@ -53,11 +56,15 @@ public class LedgerRepository : Repository<LedgerEntry>, ILedgerRepository
     public async Task<decimal> GetCashBalanceByPeriodAsync(DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
     {
         var cashIn = await Context.LedgerEntries
-            .Where(e => e.EntryType == LedgerEntryType.CashIn && e.TransactionDate >= startDate && e.TransactionDate <= endDate)
+            .Where(e => e.EntryType == LedgerEntryType.CashIn
+                        && e.CashCurrency == CashCurrency.Try
+                        && e.TransactionDate >= startDate && e.TransactionDate <= endDate)
             .SumAsync(e => e.CashAmount, cancellationToken);
 
         var cashOut = await Context.LedgerEntries
-            .Where(e => e.EntryType == LedgerEntryType.CashOut && e.TransactionDate >= startDate && e.TransactionDate <= endDate)
+            .Where(e => e.EntryType == LedgerEntryType.CashOut
+                        && e.CashCurrency == CashCurrency.Try
+                        && e.TransactionDate >= startDate && e.TransactionDate <= endDate)
             .SumAsync(e => e.CashAmount, cancellationToken);
 
         return cashIn - cashOut;
@@ -79,11 +86,11 @@ public class LedgerRepository : Repository<LedgerEntry>, ILedgerRepository
     public async Task<decimal> GetCashBalanceByCustomerAsync(Guid customerId, CancellationToken cancellationToken = default)
     {
         var cashIn = await Context.LedgerEntries
-            .Where(e => e.CustomerId == customerId && e.EntryType == LedgerEntryType.CashIn)
+            .Where(e => e.CustomerId == customerId && e.EntryType == LedgerEntryType.CashIn && e.CashCurrency == CashCurrency.Try)
             .SumAsync(e => e.CashAmount, cancellationToken);
 
         var cashOut = await Context.LedgerEntries
-            .Where(e => e.CustomerId == customerId && e.EntryType == LedgerEntryType.CashOut)
+            .Where(e => e.CustomerId == customerId && e.EntryType == LedgerEntryType.CashOut && e.CashCurrency == CashCurrency.Try)
             .SumAsync(e => e.CashAmount, cancellationToken);
 
         return cashIn - cashOut;

@@ -187,10 +187,16 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<CustomerTransaction>(e =>
         {
             e.HasOne(x => x.Customer).WithMany(x => x.AccountTransactions).HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.SourceBasketTransaction)
+                .WithMany()
+                .HasForeignKey(x => x.SourceBasketTransactionId)
+                .OnDelete(DeleteBehavior.SetNull);
             e.Property(x => x.GoldGram).HasPrecision(precision, scale);
             e.Property(x => x.GoldMilyem).HasPrecision(precision, scale);
             e.Property(x => x.GoldHas).HasPrecision(precision, scale);
             e.Property(x => x.CashAmount).HasPrecision(precision, scale);
+            e.Property(x => x.CashCurrency).HasConversion<int>();
+            e.Property(x => x.OpeningAssetKind).HasConversion<int?>();
             e.Property(x => x.Description).HasMaxLength(512);
         });
 
@@ -207,6 +213,15 @@ public class AppDbContext : DbContext
             e.Property(x => x.UnitLabour).HasPrecision(precision, scale);
             e.Property(x => x.NetHasGram).HasPrecision(precision, scale);
             e.Property(x => x.NetCashAmount).HasPrecision(precision, scale);
+            e.Property(x => x.NetCashAmountUsd).HasPrecision(precision, scale);
+            e.Property(x => x.NetCashAmountEur).HasPrecision(precision, scale);
+            e.Property(x => x.NetCashAmountGbp).HasPrecision(precision, scale);
+            e.Property(x => x.Kind).HasConversion<int>();
+            e.Property(x => x.SahisEmanetMode).HasConversion<int>();
+            e.Property(x => x.ForexBaseCurrency).HasConversion<int?>();
+            e.Property(x => x.ForexAmountBase).HasPrecision(precision, scale);
+            e.Property(x => x.ForexRateTryPerUnit).HasPrecision(18, 6);
+            e.Property(x => x.ForexCounterTry).HasPrecision(precision, scale);
             e.Property(x => x.CashAmount).HasPrecision(precision, scale);
             e.Property(x => x.EquivalentHasGram).HasPrecision(precision, scale);
             e.HasIndex(x => x.CorrelationId);
@@ -227,6 +242,7 @@ public class AppDbContext : DbContext
         {
             e.HasOne(x => x.ProductTemplate).WithMany().HasForeignKey(x => x.ProductTemplateId)
                 .OnDelete(DeleteBehavior.SetNull);
+            e.Property(x => x.PaymentCurrency).HasConversion<int>();
             e.Property(x => x.Quantity).HasPrecision(precision, scale);
             e.Property(x => x.Milyem).HasPrecision(precision, scale);
             e.Property(x => x.TotalLabour).HasPrecision(precision, scale);
@@ -271,6 +287,7 @@ public class AppDbContext : DbContext
         {
             e.Property(x => x.GoldHasAmount).HasPrecision(precision, scale);
             e.Property(x => x.CashAmount).HasPrecision(precision, scale);
+            e.Property(x => x.CashCurrency).HasConversion<int>();
             e.Property(x => x.Description).HasMaxLength(512);
             e.HasIndex(x => x.TransactionDate);
             e.HasIndex(x => x.CustomerId);

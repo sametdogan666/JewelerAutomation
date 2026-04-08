@@ -54,18 +54,27 @@ public class CustomerTransactionRepository : ICustomerTransactionRepository
             .ToListAsync(cancellationToken);
     }
 
-    /// <summary>
-    /// Gold: GoldPurchase adds, GoldSale subtracts. Cash: CashCollection adds (credit to customer), CashPayment subtracts.
-    /// GoldBalance positive = gold we hold for customer / owe to customer. CashBalance positive = we owe customer (they have credit).
-    /// </summary>
-    public async Task<(decimal GoldBalance, decimal CashBalance)> GetBalanceAsync(Guid customerId, CancellationToken cancellationToken = default)
+    /// <inheritdoc />
+    public async Task<CustomerBookBalances> GetBalanceAsync(Guid customerId, CancellationToken cancellationToken = default)
     {
         var transactions = await _context.CustomerTransactions
             .Where(x => x.CustomerId == customerId)
             .ToListAsync(cancellationToken);
 
         decimal gold = 0;
-        decimal cash = 0;
+        decimal tryB = 0, usd = 0, eur = 0, gbp = 0;
+
+        void AddCash(CashCurrency cur, decimal amt)
+        {
+            switch (cur)
+            {
+                case CashCurrency.Try: tryB += amt; break;
+                case CashCurrency.Usd: usd += amt; break;
+                case CashCurrency.Eur: eur += amt; break;
+                case CashCurrency.Gbp: gbp += amt; break;
+            }
+        }
+
         foreach (var t in transactions)
         {
             switch (t.TransactionType)
@@ -77,14 +86,51 @@ public class CustomerTransactionRepository : ICustomerTransactionRepository
                     gold -= t.GoldHas;
                     break;
                 case CustomerTransactionType.CashPayment:
-                    cash -= t.CashAmount; // customer paid us
+                    AddCash(t.CashCurrency, -t.CashAmount);
                     break;
                 case CustomerTransactionType.CashCollection:
-                    cash += t.CashAmount; // we paid customer
+                    AddCash(t.CashCurrency, t.CashAmount);
+                    break;
+                case CustomerTransactionType.OpeningBalance:
+                    ApplyOpeningBalance(t, ref gold, ref tryB, ref usd, ref eur, ref gbp, AddCash);
+                    break;
+                case CustomerTransactionType.SahisEmanetLiability:
+                    gold += t.GoldHas;
                     break;
             }
         }
-        return (gold, cash);
+
+        return new CustomerBookBalances(gold, tryB, usd, eur, gbp);
+    }
+
+    private static void ApplyOpeningBalance(
+        CustomerTransaction t,
+        ref decimal gold,
+        ref decimal tryB,
+        ref decimal usd,
+        ref decimal eur,
+        ref decimal gbp,
+        Action<CashCurrency, decimal> addCash)
+    {
+        if (t.OpeningAssetKind is not { } kind || t.OpeningCustomerIsCreditor is not { } isCreditor)
+            return;
+
+        var sign = isCreditor ? 1m : -1m;
+        if (kind == SahisOpeningAssetKind.Gold)
+        {
+            gold += sign * t.GoldHas;
+            return;
+        }
+
+        var cur = kind switch
+        {
+            SahisOpeningAssetKind.Try => CashCurrency.Try,
+            SahisOpeningAssetKind.Usd => CashCurrency.Usd,
+            SahisOpeningAssetKind.Eur => CashCurrency.Eur,
+            SahisOpeningAssetKind.Gbp => CashCurrency.Gbp,
+            _ => CashCurrency.Try
+        };
+        addCash(cur, sign * t.CashAmount);
     }
 
     public async Task<bool> AnyForCustomerAsync(Guid customerId, CancellationToken cancellationToken = default)

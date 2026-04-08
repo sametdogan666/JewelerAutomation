@@ -9,14 +9,22 @@ function safeStatusFromDashboard(d: DashboardSummary): SafeStatus {
   return {
     physicalGoldBalance: d.physicalGoldBalance ?? 0,
     physicalCashBalance: d.physicalCashBalance ?? 0,
+    physicalCashBalanceUsd: d.physicalCashBalanceUsd ?? 0,
+    physicalCashBalanceEur: d.physicalCashBalanceEur ?? 0,
+    physicalCashBalanceGbp: d.physicalCashBalanceGbp ?? 0,
     expectedGold: d.expectedGold ?? 0,
     goldGapOrSurplus: d.goldGapOrSurplus ?? 0,
     customerGoldDebt: d.totalCustomerGoldDebt ?? 0,
     customerGoldReceivable: d.totalCustomerGoldReceivable ?? 0,
     personalGoldDebt: d.totalPersonalGoldDebt ?? 0,
     personalGoldReceivable: d.totalPersonalGoldReceivable ?? 0,
+    sahisGoldLiabilitiesHasGram: d.sahisGoldLiabilitiesHasGram ?? 0,
+    netPhysicalEquityHasGram: d.netPhysicalEquityHasGram ?? 0,
     netGoldPosition: d.netGoldPositionHasGram ?? 0,
     netCashPosition: d.netCashPositionTl ?? 0,
+    netCashPositionUsd: d.netCashPositionUsd ?? 0,
+    netCashPositionEur: d.netCashPositionEur ?? 0,
+    netCashPositionGbp: d.netCashPositionGbp ?? 0,
     profitHasGram: d.profitHasGram ?? 0,
     cumulativePeggingProfitHasGram: d.cumulativePeggingProfitHasGram ?? 0,
     peggingCount: d.peggingCount ?? 0,
@@ -78,7 +86,12 @@ function safeStatusFromDashboard(d: DashboardSummary): SafeStatus {
                   <div class="metric-icon cash"><mat-icon>payments</mat-icon></div>
                   <div class="metric-body">
                     <span class="metric-label">Nakit</span>
-                    <span class="metric-value">{{ statusView()!.physicalCashBalance | number:'1.2-2' }} <small>₺</small></span>
+                    <div class="metric-cash-stack">
+                      <span class="metric-value-line">{{ statusView()!.physicalCashBalance | number:'1.2-2' }} <small>₺</small></span>
+                      <span class="metric-value-line">{{ statusView()!.physicalCashBalanceUsd | number:'1.2-2' }} <small>USD</small></span>
+                      <span class="metric-value-line">{{ statusView()!.physicalCashBalanceEur | number:'1.2-2' }} <small>EUR</small></span>
+                      <span class="metric-value-line">{{ statusView()!.physicalCashBalanceGbp | number:'1.2-2' }} <small>GBP</small></span>
+                    </div>
                   </div>
                 </div>
 
@@ -96,6 +109,56 @@ function safeStatusFromDashboard(d: DashboardSummary): SafeStatus {
                         <mat-icon>warning</mat-icon> Satış Açığı
                       </span>
                     }
+                  </div>
+                </div>
+              </div>
+
+              @if (vaultChartPolyline()) {
+                <div class="vault-chart-block">
+                  <span class="vault-chart-label">Fiziki kasa — kümülatif Has (tüm hareketler)</span>
+                  <svg class="vault-chart-svg" viewBox="0 0 100 36" preserveAspectRatio="none">
+                    <polyline
+                      class="vault-chart-line"
+                      fill="none"
+                      stroke="rgba(255,255,255,0.92)"
+                      stroke-width="0.9"
+                      [attr.points]="vaultChartPolyline()!" />
+                  </svg>
+                  <div class="vault-chart-foot">
+                    <span>{{ vaultChartStartLabel() }}</span>
+                    <span>{{ vaultChartEndLabel() }}</span>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- ─── Şahıs emanetleri (Has) & öz sermaye ─── -->
+            <div class="section section--equity">
+              <h3 class="section-title">
+                <mat-icon>handshake</mat-icon>
+                Şahıs emanetleri
+                <span class="section-hint">Fiziki altın − şahıs yükümlülükleri</span>
+              </h3>
+              <div class="metric-grid metric-grid--tight">
+                <div class="metric">
+                  <div class="metric-icon gold"><mat-icon>inventory</mat-icon></div>
+                  <div class="metric-body">
+                    <span class="metric-label">Fiziki altın (brüt)</span>
+                    <span class="metric-value">{{ statusView()!.physicalGoldBalance | number:'1.2-2' }} <small>Has Gr</small></span>
+                  </div>
+                </div>
+                <div class="metric">
+                  <div class="metric-icon debt"><mat-icon>person_pin</mat-icon></div>
+                  <div class="metric-body">
+                    <span class="metric-label">Şahıs emanet yükümlülüğü</span>
+                    <span class="metric-value">{{ statusView()!.sahisGoldLiabilitiesHasGram | number:'1.2-2' }} <small>Has Gr</small></span>
+                  </div>
+                </div>
+                <div class="metric metric--primary">
+                  <div class="metric-icon cash"><mat-icon>balance</mat-icon></div>
+                  <div class="metric-body">
+                    <span class="metric-label">Öz sermaye (Has)</span>
+                    <span class="metric-value">{{ statusView()!.netPhysicalEquityHasGram | number:'1.2-2' }} <small>Has Gr</small></span>
                   </div>
                 </div>
               </div>
@@ -122,7 +185,12 @@ function safeStatusFromDashboard(d: DashboardSummary): SafeStatus {
                   <div class="net-icon net-icon--cash"><mat-icon>payments</mat-icon></div>
                   <div class="net-body">
                     <span class="net-label">Net Nakit</span>
-                    <span class="net-value">{{ statusView()!.netCashPosition | number:'1.0-0' }} <small>₺</small></span>
+                    <div class="net-cash-stack">
+                      <span class="net-value-line">{{ statusView()!.netCashPosition | number:'1.0-0' }} <small>₺</small></span>
+                      <span class="net-value-line">{{ statusView()!.netCashPositionUsd | number:'1.2-2' }} <small>USD</small></span>
+                      <span class="net-value-line">{{ statusView()!.netCashPositionEur | number:'1.2-2' }} <small>EUR</small></span>
+                      <span class="net-value-line">{{ statusView()!.netCashPositionGbp | number:'1.2-2' }} <small>GBP</small></span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -249,6 +317,10 @@ function safeStatusFromDashboard(d: DashboardSummary): SafeStatus {
       grid-template-columns: 1fr 1fr;
       gap: .5rem;
     }
+    .metric-grid--tight {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .section--equity .metric-grid--tight .metric:last-child { grid-column: auto; }
     .metric {
       background: rgba(255,255,255,.12);
       border-radius: 10px; padding: 0.65rem 0.75rem;
@@ -268,10 +340,19 @@ function safeStatusFromDashboard(d: DashboardSummary): SafeStatus {
     .metric-icon.gold { background: linear-gradient(135deg,#ffa000,#ffc107); }
     .metric-icon.cash { background: linear-gradient(135deg,#2e7d32,#4caf50); }
     .metric-icon.gap  { background: linear-gradient(135deg,#1565c0,#42a5f5); }
+    .metric-icon.debt { background: linear-gradient(135deg,#c62828,#e57373); }
 
     .metric-body { flex: 1; display: flex; flex-direction: column; gap: .2rem; }
     .metric-label { font-size: .75rem; color: rgba(255,255,255,.7); text-transform: uppercase; letter-spacing: .5px; }
     .metric-value { font-size: 1.4rem; font-weight: 700; color: white; small { font-size: .8rem; font-weight: 500; color: rgba(255,255,255,.7); } }
+    .metric-cash-stack {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem;
+      margin-top: 0.15rem;
+    }
+    .metric-value-line {
+      font-size: 1.05rem; font-weight: 700; color: white;
+      small { font-size: .68rem; font-weight: 500; color: rgba(255,255,255,.65); margin-left: 0.2rem; }
+    }
 
     .metric-badge {
       display: inline-flex; align-items: center; gap: .25rem;
@@ -283,6 +364,34 @@ function safeStatusFromDashboard(d: DashboardSummary): SafeStatus {
 
     .metric--shortage { border-color: rgba(244,67,54,.5); }
     .metric--surplus  { border-color: rgba(76,175,80,.5); }
+
+    .vault-chart-block {
+      margin-top: 0.5rem;
+      padding: 0.45rem 0.55rem;
+      background: rgba(0,0,0,.12);
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,.12);
+    }
+    .vault-chart-label {
+      display: block;
+      font-size: 0.68rem;
+      color: rgba(255,255,255,.65);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 0.35rem;
+    }
+    .vault-chart-svg {
+      width: 100%;
+      height: 72px;
+      display: block;
+    }
+    .vault-chart-foot {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.65rem;
+      color: rgba(255,255,255,.55);
+      margin-top: 0.25rem;
+    }
 
     .net-row {
       display: grid;
@@ -313,6 +422,14 @@ function safeStatusFromDashboard(d: DashboardSummary): SafeStatus {
     .net-body { flex: 1; display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
     .net-label { font-size: .65rem; color: rgba(255,255,255,.75); text-transform: uppercase; letter-spacing: .5px; }
     .net-value { font-size: 1.35rem; font-weight: 700; color: white; line-height: 1.15; small { font-size: .72rem; color: rgba(255,255,255,.7); } }
+    .net-cash-stack {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 0.12rem;
+      margin-top: 0.2rem;
+    }
+    .net-value-line {
+      font-size: 1.05rem; font-weight: 700; color: white; line-height: 1.2;
+      small { font-size: .65rem; color: rgba(255,255,255,.7); margin-left: 0.2rem; }
+    }
 
     /* ── Debt / Receivable grid ── */
     .debt-grid {
@@ -397,6 +514,7 @@ function safeStatusFromDashboard(d: DashboardSummary): SafeStatus {
 
     @media (max-width: 768px) {
       .metric-grid { grid-template-columns: 1fr; }
+      .metric-grid--tight { grid-template-columns: 1fr; }
       .metric:last-child { grid-column: span 1; }
       .debt-grid { grid-template-columns: 1fr; }
       .net-row { grid-template-columns: 1fr; }
@@ -408,6 +526,38 @@ export class SafeStatusWidgetComponent {
   dashboard = input.required<DashboardSummary>();
 
   statusView = computed(() => safeStatusFromDashboard(this.dashboard()));
+
+  /** SVG polyline points for cumulative physical vault history (normalized 0–100 × 0–36). */
+  vaultChartPolyline = computed((): string | null => {
+    const hist = this.dashboard().physicalVaultHistory ?? [];
+    if (hist.length < 2) return null;
+    const vals = hist.map((h) => h.cumulativeHasGram);
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const range = Math.max(max - min, 1e-9);
+    const n = vals.length - 1;
+    return vals
+      .map((v, i) => {
+        const x = n === 0 ? 0 : (i / n) * 100;
+        const y = 34 - ((v - min) / range) * 30;
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      })
+      .join(' ');
+  });
+
+  vaultChartStartLabel = computed(() => {
+    const hist = this.dashboard().physicalVaultHistory ?? [];
+    if (hist.length === 0) return '';
+    const h = hist[0];
+    return `${new Date(h.at).toLocaleDateString('tr-TR')} → ${h.cumulativeHasGram.toFixed(2)} Has`;
+  });
+
+  vaultChartEndLabel = computed(() => {
+    const hist = this.dashboard().physicalVaultHistory ?? [];
+    if (hist.length === 0) return '';
+    const h = hist[hist.length - 1];
+    return `${new Date(h.at).toLocaleDateString('tr-TR')} → ${h.cumulativeHasGram.toFixed(2)} Has`;
+  });
 
   liveMid = computed(() => this.dashboard().liveHasTryPerGramMid ?? null);
   netGoldTl = computed(() => this.dashboard().netGoldPositionTlApprox ?? null);

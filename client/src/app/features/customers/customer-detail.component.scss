@@ -97,6 +97,15 @@
     }
   }
 
+  .balance-body--cash {
+    .balance-line {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      small { font-size: 0.7rem; color: var(--text-muted); margin-left: 0.2rem; }
+    }
+  }
+
   .balance-label {
     font-size: 0.8125rem;
     color: var(--text-muted);
@@ -229,6 +238,8 @@
   .badge-gold-sale { background: #fff3e0; color: #e65100; }
   .badge-cash-payment { background: #e3f2fd; color: #1565c0; }
   .badge-cash-collection { background: #fce4ec; color: #c2185b; }
+  .badge-opening { background: #e0f2f1; color: #00695c; }
+  .badge-emanet { background: #ede7f6; color: #4527a0; }
 
   .actions-header {
     text-align: right;
@@ -246,5 +257,93 @@
     &:hover {
       background-color: #f9f9f9;
     }
+  }
+
+  .net-cash-cell {
+    font-size: 0.8125rem;
+    white-space: normal;
+    max-width: 14rem;
+  }
+
+  tr.detail-row {
+    height: 0;
+  }
+
+  tr.detail-row--hidden {
+    display: none;
+  }
+
+  .expanded-cell {
+    padding: 0 !important;
+    border-bottom-width: 1px;
+  }
+
+  .basket-lines {
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: #f5f7fa;
+    border-top: 1px dashed #e0e0e0;
+  }
+
+  .basket-lines-title {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .nested-lines {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+
+    th {
+      text-align: left;
+      padding: 0.35rem 0.5rem;
+      background: transparent;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    td {
+      padding: 0.35rem 0.5rem;
+      border-bottom: 1px solid #eee;
+    }
+  }
+}
+
+.opening-balance-card {
+  margin-bottom: var(--spacing-xl);
+  border: 1px solid var(--card-border);
+
+  .opening-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .form-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    align-items: center;
+  }
+
+  .radio-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    min-width: 3rem;
+  }
+
+  .dir-radio {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .full-width {
+    width: 100%;
   }
 }

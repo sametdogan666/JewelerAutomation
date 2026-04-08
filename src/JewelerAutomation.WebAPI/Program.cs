@@ -10,6 +10,7 @@ using JewelerAutomation.Application.Services;
 using JewelerAutomation.Core.Entities;
 using JewelerAutomation.Infrastructure.Auditing;
 using JewelerAutomation.Infrastructure.Data;
+using JewelerAutomation.Infrastructure.Persistence;
 using JewelerAutomation.Infrastructure.GoldRates;
 using JewelerAutomation.Infrastructure.Repositories;
 using JewelerAutomation.WebAPI.HostedServices;
@@ -46,6 +47,7 @@ builder.Services.AddHttpClient("HaremAltin", (sp, client) =>
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddScoped<BaseEntityTimestampInterceptor>();
 builder.Services.AddScoped<AuditSaveChangesInterceptor>();
 
 builder.Services.AddDbContext<AppDbContext>((sp, options) =>
@@ -54,7 +56,9 @@ builder.Services.AddDbContext<AppDbContext>((sp, options) =>
         options.UseNpgsql(connectionString);
     else
         options.UseSqlServer(connectionString);
-    options.AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>());
+    options.AddInterceptors(
+        sp.GetRequiredService<BaseEntityTimestampInterceptor>(),
+        sp.GetRequiredService<AuditSaveChangesInterceptor>());
 });
 
 // Repositories & Unit of Work

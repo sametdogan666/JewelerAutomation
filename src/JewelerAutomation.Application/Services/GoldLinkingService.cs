@@ -177,6 +177,7 @@ public class GoldLinkingService : IGoldLinkingService
                 targetAmountGram,
                 processId,
                 $"FIFO Nakit Bağlama: {targetAmountGram:N4} Has @ {targetPricePerGram:N4} TL/Gr",
+                CashCurrency.Try,
                 cancellationToken).ConfigureAwait(false);
 
             SafeMovement? profitMovement = null;

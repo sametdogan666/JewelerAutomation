@@ -22,8 +22,10 @@ public class CapitalCalculationService : ICapitalCalculationService
 
     public async Task<CapitalSummary> GetCapitalSummaryAsync(CancellationToken cancellationToken = default)
     {
-        // 1. Kasadaki altın — defter (ledger) ile panel / PeggingService aynı kaynak.
-        var totalGoldInSafe = await _ledger.GetSafeGoldBalanceAsync(cancellationToken).ConfigureAwait(false);
+        // 1. Kasadaki altın — tüm SafeMovements (manuel + sepet) imzalı toplamı; panel ile aynı.
+        var totalGoldInSafe = await _unitOfWork.SafeMovements
+            .GetPhysicalVaultNetHasGramAsync(cancellationToken)
+            .ConfigureAwait(false);
 
         // 2. Kasadaki nakit — defter CashIn/CashOut toplamı (SafeMovement kayıtları üzerinden).
         var totalCashInSafe = await _ledger.GetSafeCashBalanceAsync(cancellationToken).ConfigureAwait(false);
@@ -38,7 +40,7 @@ public class CapitalCalculationService : ICapitalCalculationService
 
         foreach (var customer in commercialCustomers)
         {
-            var (goldBalance, _) = await _unitOfWork.CustomerTransactions.GetBalanceAsync(customer.Id, cancellationToken);
+            var goldBalance = (await _unitOfWork.CustomerTransactions.GetBalanceAsync(customer.Id, cancellationToken)).GoldHasGram;
             if (goldBalance > 0)
                 totalCommercialDebt += goldBalance; // Müşteriye altın borcumuz
             else if (goldBalance < 0)
@@ -52,7 +54,7 @@ public class CapitalCalculationService : ICapitalCalculationService
 
         foreach (var customer in personalCustomers)
         {
-            var (goldBalance, _) = await _unitOfWork.CustomerTransactions.GetBalanceAsync(customer.Id, cancellationToken);
+            var goldBalance = (await _unitOfWork.CustomerTransactions.GetBalanceAsync(customer.Id, cancellationToken)).GoldHasGram;
             if (goldBalance > 0)
                 totalPersonalDebt += goldBalance; // Şahsa altın borcumuz
             else if (goldBalance < 0)

@@ -22,78 +22,40 @@ public class PeggingService : IPeggingService
         _goldLinking = goldLinking;
     }
 
-    /// <summary>Dönem nakit bağlama başlığı: sepet kalemi yok, nakit/has alanları dolu.</summary>
-    private static bool IsHybridPeggingTransaction(Transaction tx) =>
-        tx.CorrelationId.HasValue
-        && !tx.Items.Any()
-        && tx.CashAmount.HasValue
-        && tx.EquivalentHasGram.HasValue;
-
     public async Task<SafeStatus> ComputeDashboardSafeStatusAsync(CancellationToken cancellationToken = default)
     {
         var balances = await _ledger.GetBalancesAsync(cancellationToken).ConfigureAwait(false);
-        var physicalGold = balances.SafeGoldBalance;
-        var physicalCash = balances.SafeCashBalance;
+        var physicalGold = await _unitOfWork.SafeMovements
+            .GetPhysicalVaultNetHasGramAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var physicalCashTry = balances.SafeCashBalance;
+        var physicalCashUsd = await _unitOfWork.Ledger
+            .GetCashBalanceForCurrencyAsync(CashCurrency.Usd, cancellationToken).ConfigureAwait(false);
+        var physicalCashEur = await _unitOfWork.Ledger
+            .GetCashBalanceForCurrencyAsync(CashCurrency.Eur, cancellationToken).ConfigureAwait(false);
+        var physicalCashGbp = await _unitOfWork.Ledger
+            .GetCashBalanceForCurrencyAsync(CashCurrency.Gbp, cancellationToken).ConfigureAwait(false);
 
         var allMovements = await _unitOfWork.SafeMovements.GetAllAsync(cancellationToken).ConfigureAwait(false);
-        decimal capitalGold = 0;
-        foreach (var sm in allMovements)
-        {
-            if (sm.SourceTransactionId.HasValue) continue;
-            capitalGold += sm.MovementType switch
-            {
-                SafeMovementType.Capital => sm.HasGram,
-                SafeMovementType.Income => sm.HasGram,
-                SafeMovementType.Expense => -Math.Abs(sm.HasGram),
-                SafeMovementType.Transfer => sm.HasGram,
-                SafeMovementType.ProfitRealization => 0m,
-                SafeMovementType.LinkingProfit => 0m,
-                _ => 0m
-            };
-        }
-
-        var transactions = await _unitOfWork.Transactions.GetAllAsync(cancellationToken).ConfigureAwait(false);
-        decimal tradingPurchases = 0, tradingSales = 0;
-        foreach (var tx in transactions)
-        {
-            if (IsHybridPeggingTransaction(tx))
-                continue;
-
-            if (tx.Items.Any())
-            {
-                foreach (var item in tx.Items)
-                {
-                    if (item.Direction == TransactionDirection.Purchase)
-                        tradingPurchases += item.HasGram;
-                    else
-                        tradingSales += item.HasGram;
-                }
-            }
-            else
-            {
-                if (tx.Direction == TransactionDirection.Purchase)
-                    tradingPurchases += tx.HasGram;
-                else if (tx.Direction == TransactionDirection.Sale)
-                    tradingSales += tx.HasGram;
-            }
-        }
 
         var openUnpeggedSalesGram = await _goldLinking
             .GetOpenHasPositionAsync(null, null, cancellationToken)
             .ConfigureAwait(false);
 
-        var expectedGold = capitalGold + tradingPurchases - tradingSales;
+        var expectedGold = physicalGold;
         var goldGapOrSurplus = Math.Round(-openUnpeggedSalesGram, 6);
 
         var customers = await _unitOfWork.Customers.GetAllAsync(cancellationToken).ConfigureAwait(false);
 
         decimal customerDebt = 0, customerReceivable = 0;
         decimal personalDebt = 0, personalReceivable = 0;
+        decimal sahısGoldLiabilitiesHasGram = 0;
 
         foreach (var c in customers)
         {
-            var (goldBalance, _) = await _unitOfWork.CustomerTransactions
+            var book = await _unitOfWork.CustomerTransactions
                 .GetBalanceAsync(c.Id, cancellationToken).ConfigureAwait(false);
+            var goldBalance = book.GoldHasGram;
 
             if (c.Type == CustomerType.Cari)
             {
@@ -102,15 +64,24 @@ public class PeggingService : IPeggingService
             }
             else if (c.Type == CustomerType.Sahis)
             {
-                if (goldBalance > 0) personalDebt += goldBalance;
+                if (goldBalance > 0)
+                {
+                    personalDebt += goldBalance;
+                    sahısGoldLiabilitiesHasGram += goldBalance;
+                }
                 else if (goldBalance < 0) personalReceivable += Math.Abs(goldBalance);
             }
         }
 
+        var netPhysicalEquityHasGram = physicalGold - sahısGoldLiabilitiesHasGram;
+
         var netGold = physicalGold
             + customerReceivable + personalReceivable
             - customerDebt - personalDebt;
-        var netCash = physicalCash;
+        var netCashTry = physicalCashTry;
+        var netCashUsd = physicalCashUsd;
+        var netCashEur = physicalCashEur;
+        var netCashGbp = physicalCashGbp;
 
         var initialCapitalMovement = allMovements
             .Where(m => m.MovementType == SafeMovementType.Capital)
@@ -128,15 +99,23 @@ public class PeggingService : IPeggingService
 
         return new SafeStatus(
             PhysicalGoldBalance: physicalGold,
-            PhysicalCashBalance: physicalCash,
+            PhysicalCashBalance: physicalCashTry,
+            PhysicalCashBalanceUsd: physicalCashUsd,
+            PhysicalCashBalanceEur: physicalCashEur,
+            PhysicalCashBalanceGbp: physicalCashGbp,
             ExpectedGold: expectedGold,
             GoldGapOrSurplus: goldGapOrSurplus,
             CustomerGoldDebt: customerDebt,
             CustomerGoldReceivable: customerReceivable,
             PersonalGoldDebt: personalDebt,
             PersonalGoldReceivable: personalReceivable,
+            SahisGoldLiabilitiesHasGram: sahısGoldLiabilitiesHasGram,
+            NetPhysicalEquityHasGram: netPhysicalEquityHasGram,
             NetGoldPosition: netGold,
-            NetCashPosition: netCash,
+            NetCashPosition: netCashTry,
+            NetCashPositionUsd: netCashUsd,
+            NetCashPositionEur: netCashEur,
+            NetCashPositionGbp: netCashGbp,
             ProfitHasGram: profitHasGram,
             CumulativePeggingProfitHasGram: cumulativePeggingProfit,
             PeggingCount: peggingCount

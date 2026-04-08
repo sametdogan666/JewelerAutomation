@@ -21,6 +21,7 @@ public class LedgerService : ILedgerService
         Guid? customerId,
         string? description,
         Guid? correlationId = null,
+        CashCurrency cashCurrency = CashCurrency.Try,
         CancellationToken cancellationToken = default)
     {
         if (direction == TransactionDirection.Sale)
@@ -31,6 +32,7 @@ public class LedgerService : ILedgerService
                 EntryType = LedgerEntryType.GoldOut,
                 GoldHasAmount = goldHasAmount,
                 CashAmount = 0,
+                CashCurrency = CashCurrency.Try,
                 ReferenceType = LedgerReferenceType.Transaction,
                 ReferenceId = referenceId,
                 CustomerId = customerId,
@@ -46,6 +48,7 @@ public class LedgerService : ILedgerService
                     EntryType = LedgerEntryType.CashIn,
                     GoldHasAmount = 0,
                     CashAmount = cashAmount.Value,
+                    CashCurrency = cashCurrency,
                     ReferenceType = LedgerReferenceType.Transaction,
                     ReferenceId = referenceId,
                     CustomerId = customerId,
@@ -62,6 +65,7 @@ public class LedgerService : ILedgerService
                 EntryType = LedgerEntryType.GoldIn,
                 GoldHasAmount = goldHasAmount,
                 CashAmount = 0,
+                CashCurrency = CashCurrency.Try,
                 ReferenceType = LedgerReferenceType.Transaction,
                 ReferenceId = referenceId,
                 CustomerId = customerId,
@@ -77,6 +81,7 @@ public class LedgerService : ILedgerService
                     EntryType = LedgerEntryType.CashOut,
                     GoldHasAmount = 0,
                     CashAmount = cashAmount.Value,
+                    CashCurrency = cashCurrency,
                     ReferenceType = LedgerReferenceType.Transaction,
                     ReferenceId = referenceId,
                     CustomerId = customerId,
@@ -87,6 +92,172 @@ public class LedgerService : ILedgerService
         }
     }
 
+    public async Task RecordCurrencyExchangeAsync(
+        DateTime transactionDate,
+        CashCurrency sellCurrency,
+        decimal sellAmount,
+        CashCurrency buyCurrency,
+        decimal buyAmount,
+        Guid referenceId,
+        string? description,
+        CancellationToken cancellationToken = default)
+    {
+        if (sellCurrency == buyCurrency)
+            throw new ArgumentException("Satış ve alış para birimleri farklı olmalıdır.");
+        if (sellAmount <= 0 || buyAmount <= 0)
+            throw new ArgumentException("Tutarlar sıfırdan büyük olmalıdır.");
+
+        await _unitOfWork.Ledger.AddAsync(new LedgerEntry
+        {
+            TransactionDate = transactionDate,
+            EntryType = LedgerEntryType.CashOut,
+            GoldHasAmount = 0,
+            CashAmount = sellAmount,
+            CashCurrency = sellCurrency,
+            ReferenceType = LedgerReferenceType.CurrencyExchange,
+            ReferenceId = referenceId,
+            CustomerId = null,
+            Description = description
+        }, cancellationToken);
+
+        await _unitOfWork.Ledger.AddAsync(new LedgerEntry
+        {
+            TransactionDate = transactionDate,
+            EntryType = LedgerEntryType.CashIn,
+            GoldHasAmount = 0,
+            CashAmount = buyAmount,
+            CashCurrency = buyCurrency,
+            ReferenceType = LedgerReferenceType.CurrencyExchange,
+            ReferenceId = referenceId,
+            CustomerId = null,
+            Description = description
+        }, cancellationToken);
+    }
+
+    public async Task RecordForexTradeAgainstTryAsync(
+        DateTime transactionDate,
+        CashCurrency baseCurrency,
+        bool isBuy,
+        decimal amountBase,
+        decimal counterTryAbs,
+        Guid referenceId,
+        string? description,
+        CancellationToken cancellationToken = default)
+    {
+        if (baseCurrency == CashCurrency.Try)
+            throw new ArgumentException("Döviz işleminde temel para birimi TL olamaz.");
+        if (amountBase <= 0 || counterTryAbs <= 0)
+            throw new ArgumentException("Tutarlar sıfırdan büyük olmalıdır.");
+
+        if (isBuy)
+        {
+            await _unitOfWork.Ledger.AddAsync(new LedgerEntry
+            {
+                TransactionDate = transactionDate,
+                EntryType = LedgerEntryType.CashOut,
+                GoldHasAmount = 0,
+                CashAmount = counterTryAbs,
+                CashCurrency = CashCurrency.Try,
+                ReferenceType = LedgerReferenceType.Transaction,
+                ReferenceId = referenceId,
+                CustomerId = null,
+                Description = description
+            }, cancellationToken);
+
+            await _unitOfWork.Ledger.AddAsync(new LedgerEntry
+            {
+                TransactionDate = transactionDate,
+                EntryType = LedgerEntryType.CashIn,
+                GoldHasAmount = 0,
+                CashAmount = amountBase,
+                CashCurrency = baseCurrency,
+                ReferenceType = LedgerReferenceType.Transaction,
+                ReferenceId = referenceId,
+                CustomerId = null,
+                Description = description
+            }, cancellationToken);
+        }
+        else
+        {
+            await _unitOfWork.Ledger.AddAsync(new LedgerEntry
+            {
+                TransactionDate = transactionDate,
+                EntryType = LedgerEntryType.CashOut,
+                GoldHasAmount = 0,
+                CashAmount = amountBase,
+                CashCurrency = baseCurrency,
+                ReferenceType = LedgerReferenceType.Transaction,
+                ReferenceId = referenceId,
+                CustomerId = null,
+                Description = description
+            }, cancellationToken);
+
+            await _unitOfWork.Ledger.AddAsync(new LedgerEntry
+            {
+                TransactionDate = transactionDate,
+                EntryType = LedgerEntryType.CashIn,
+                GoldHasAmount = 0,
+                CashAmount = counterTryAbs,
+                CashCurrency = CashCurrency.Try,
+                ReferenceType = LedgerReferenceType.Transaction,
+                ReferenceId = referenceId,
+                CustomerId = null,
+                Description = description
+            }, cancellationToken);
+        }
+    }
+
+    public async Task RecordShopCashInAsync(
+        DateTime transactionDate,
+        decimal cashAmount,
+        CashCurrency cashCurrency,
+        Guid referenceId,
+        string? description,
+        Guid? correlationId,
+        CancellationToken cancellationToken = default)
+    {
+        if (cashAmount <= 0)
+            return;
+        await _unitOfWork.Ledger.AddAsync(new LedgerEntry
+        {
+            TransactionDate = transactionDate,
+            EntryType = LedgerEntryType.CashIn,
+            GoldHasAmount = 0,
+            CashAmount = cashAmount,
+            CashCurrency = cashCurrency,
+            ReferenceType = LedgerReferenceType.Transaction,
+            ReferenceId = referenceId,
+            CustomerId = null,
+            Description = description,
+            CorrelationId = correlationId
+        }, cancellationToken);
+    }
+
+    public async Task RecordShopGoldInAsync(
+        DateTime transactionDate,
+        decimal goldHasAmount,
+        Guid referenceId,
+        string? description,
+        Guid? correlationId,
+        CancellationToken cancellationToken = default)
+    {
+        if (goldHasAmount <= 0)
+            return;
+        await _unitOfWork.Ledger.AddAsync(new LedgerEntry
+        {
+            TransactionDate = transactionDate,
+            EntryType = LedgerEntryType.GoldIn,
+            GoldHasAmount = goldHasAmount,
+            CashAmount = 0,
+            CashCurrency = CashCurrency.Try,
+            ReferenceType = LedgerReferenceType.Transaction,
+            ReferenceId = referenceId,
+            CustomerId = null,
+            Description = description,
+            CorrelationId = correlationId
+        }, cancellationToken);
+    }
+
     public async Task RecordCustomerTransactionAsync(
         DateTime transactionDate,
         CustomerTransactionType transactionType,
@@ -95,6 +266,7 @@ public class LedgerService : ILedgerService
         Guid customerId,
         Guid referenceId,
         string? description,
+        CashCurrency cashCurrency = CashCurrency.Try,
         CancellationToken cancellationToken = default)
     {
         switch (transactionType)
@@ -106,6 +278,7 @@ public class LedgerService : ILedgerService
                     EntryType = LedgerEntryType.GoldIn,
                     GoldHasAmount = goldHasAmount,
                     CashAmount = 0,
+                    CashCurrency = CashCurrency.Try,
                     ReferenceType = LedgerReferenceType.CustomerTransaction,
                     ReferenceId = referenceId,
                     CustomerId = customerId,
@@ -120,6 +293,7 @@ public class LedgerService : ILedgerService
                     EntryType = LedgerEntryType.GoldOut,
                     GoldHasAmount = goldHasAmount,
                     CashAmount = 0,
+                    CashCurrency = CashCurrency.Try,
                     ReferenceType = LedgerReferenceType.CustomerTransaction,
                     ReferenceId = referenceId,
                     CustomerId = customerId,
@@ -134,6 +308,7 @@ public class LedgerService : ILedgerService
                     EntryType = LedgerEntryType.CashIn,
                     GoldHasAmount = 0,
                     CashAmount = cashAmount,
+                    CashCurrency = cashCurrency,
                     ReferenceType = LedgerReferenceType.CustomerTransaction,
                     ReferenceId = referenceId,
                     CustomerId = customerId,
@@ -148,6 +323,7 @@ public class LedgerService : ILedgerService
                     EntryType = LedgerEntryType.CashOut,
                     GoldHasAmount = 0,
                     CashAmount = cashAmount,
+                    CashCurrency = cashCurrency,
                     ReferenceType = LedgerReferenceType.CustomerTransaction,
                     ReferenceId = referenceId,
                     CustomerId = customerId,
@@ -184,6 +360,7 @@ public class LedgerService : ILedgerService
             EntryType = entryType,
             GoldHasAmount = Math.Abs(goldHasAmount),
             CashAmount = 0,
+            CashCurrency = CashCurrency.Try,
             ReferenceType = LedgerReferenceType.SafeMovement,
             ReferenceId = referenceId,
             CustomerId = null,
@@ -197,6 +374,7 @@ public class LedgerService : ILedgerService
         decimal goldHasAmount,
         Guid linkingProcessId,
         string? description,
+        CashCurrency cashCurrency = CashCurrency.Try,
         CancellationToken cancellationToken = default)
     {
         await _unitOfWork.Ledger.AddAsync(new LedgerEntry
@@ -205,6 +383,7 @@ public class LedgerService : ILedgerService
             EntryType = LedgerEntryType.CashOut,
             GoldHasAmount = 0,
             CashAmount = cashAmount,
+            CashCurrency = cashCurrency,
             ReferenceType = LedgerReferenceType.LinkingProcess,
             ReferenceId = linkingProcessId,
             CustomerId = null,
@@ -217,6 +396,7 @@ public class LedgerService : ILedgerService
             EntryType = LedgerEntryType.GoldIn,
             GoldHasAmount = goldHasAmount,
             CashAmount = 0,
+            CashCurrency = CashCurrency.Try,
             ReferenceType = LedgerReferenceType.LinkingProcess,
             ReferenceId = linkingProcessId,
             CustomerId = null,
@@ -230,6 +410,7 @@ public class LedgerService : ILedgerService
         decimal goldHasAmount,
         Guid referenceId,
         string? description,
+        CashCurrency cashCurrency = CashCurrency.Try,
         CancellationToken cancellationToken = default)
     {
         await _unitOfWork.Ledger.AddAsync(new LedgerEntry
@@ -238,6 +419,7 @@ public class LedgerService : ILedgerService
             EntryType = LedgerEntryType.CashOut,
             GoldHasAmount = 0,
             CashAmount = cashAmount,
+            CashCurrency = cashCurrency,
             ReferenceType = LedgerReferenceType.CashPegging,
             ReferenceId = referenceId,
             CustomerId = null,
@@ -250,6 +432,7 @@ public class LedgerService : ILedgerService
             EntryType = LedgerEntryType.GoldIn,
             GoldHasAmount = goldHasAmount,
             CashAmount = 0,
+            CashCurrency = CashCurrency.Try,
             ReferenceType = LedgerReferenceType.CashPegging,
             ReferenceId = referenceId,
             CustomerId = null,
@@ -264,6 +447,7 @@ public class LedgerService : ILedgerService
         Guid referenceId,
         Guid? customerId,
         string? description,
+        CashCurrency cashCurrency = CashCurrency.Try,
         CancellationToken cancellationToken = default)
     {
         await _unitOfWork.Ledger.AddAsync(new LedgerEntry
@@ -272,6 +456,7 @@ public class LedgerService : ILedgerService
             EntryType = LedgerEntryType.CashOut,
             GoldHasAmount = 0,
             CashAmount = cashAmount,
+            CashCurrency = cashCurrency,
             ReferenceType = LedgerReferenceType.CashToGoldConversion,
             ReferenceId = referenceId,
             CustomerId = customerId,
@@ -284,6 +469,7 @@ public class LedgerService : ILedgerService
             EntryType = LedgerEntryType.GoldIn,
             GoldHasAmount = goldHasAmount,
             CashAmount = 0,
+            CashCurrency = CashCurrency.Try,
             ReferenceType = LedgerReferenceType.CashToGoldConversion,
             ReferenceId = referenceId,
             CustomerId = customerId,

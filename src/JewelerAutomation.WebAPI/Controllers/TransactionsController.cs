@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using JewelerAutomation.Application.Interfaces;
-using JewelerAutomation.Application.Services;
+using JewelerAutomation.Application.Utilities;
 using JewelerAutomation.Core.Entities;
 using JewelerAutomation.Infrastructure.Data;
 
@@ -67,12 +67,160 @@ public class TransactionsController : ControllerBase
         return LineCashFromUnitPrice(hasGram, unitPricePerHasGram);
     }
 
+    private static CashCurrency ParsePaymentCurrency(int? v) =>
+        v switch
+        {
+            1 => CashCurrency.Usd,
+            2 => CashCurrency.Eur,
+            3 => CashCurrency.Gbp,
+            _ => CashCurrency.Try
+        };
+
     private sealed record ResolvedBasketItem(
         int? PieceCount,
         decimal? UnitLabour,
         decimal TotalLabour,
         decimal HasGram,
         decimal MilyemLabour);
+
+    private static string? ValidateSahisBasket(BasketCreateDto dto, Customer? customer)
+    {
+        if (!dto.IsSahisEmanet)
+            return null;
+        if (dto.CustomerId == null || customer == null || customer.Type != CustomerType.Sahis)
+            return "Emanet sepeti yalnız şahıs cari seçildiğinde kullanılabilir.";
+        var mode = (SahisEmanetMode)dto.SahisEmanetMode;
+        if (mode != SahisEmanetMode.EmanetSatis && mode != SahisEmanetMode.EmanetAlis)
+            return "Emanet modu satış veya alış olarak seçilmelidir.";
+        if (mode == SahisEmanetMode.EmanetSatis && dto.Items!.Any(i => i.Direction != TransactionDirection.Sale))
+            return "Emanet satış sepetinde yalnız satış kalemleri olabilir.";
+        if (mode == SahisEmanetMode.EmanetAlis && dto.Items!.Any(i => i.Direction != TransactionDirection.Purchase))
+            return "Emanet alış sepetinde yalnız alış kalemleri olabilir.";
+        return null;
+    }
+
+    private static bool SkipGoldLinkingForSale(BasketCreateDto dto, TransactionDirection direction) =>
+        dto.IsSahisEmanet
+        && (SahisEmanetMode)dto.SahisEmanetMode == SahisEmanetMode.EmanetSatis
+        && direction == TransactionDirection.Sale;
+
+    private async Task PostBasketItemPhysicalAsync(
+        Transaction transaction,
+        BasketCreateDto dto,
+        BasketItemDto itemDto,
+        ResolvedBasketItem r,
+        decimal lineCash,
+        CashCurrency payCur,
+        Guid correlationId,
+        CancellationToken cancellationToken)
+    {
+        if (!dto.KasaHareketli)
+            return;
+
+        var mode = (SahisEmanetMode)dto.SahisEmanetMode;
+        var emanetSatis = dto.IsSahisEmanet && mode == SahisEmanetMode.EmanetSatis && itemDto.Direction == TransactionDirection.Sale;
+        var emanetAlis = dto.IsSahisEmanet && mode == SahisEmanetMode.EmanetAlis && itemDto.Direction == TransactionDirection.Purchase;
+
+        if (emanetSatis)
+        {
+            if (lineCash > 0)
+            {
+                await _ledger.RecordShopCashInAsync(
+                    dto.TransactionDate,
+                    lineCash,
+                    payCur,
+                    transaction.Id,
+                    itemDto.Description ?? dto.Description,
+                    correlationId,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            return;
+        }
+
+        if (emanetAlis)
+        {
+            var safeMovement = new SafeMovement
+            {
+                TransactionDate = dto.TransactionDate,
+                Gram = itemDto.Quantity,
+                Milyem = itemDto.Milyem,
+                HasGram = r.HasGram,
+                Description = $"Emanet alış: {itemDto.Description ?? dto.Description ?? "—"}",
+                MovementType = SafeMovementType.Income,
+                SourceTransactionId = transaction.Id,
+                CorrelationId = correlationId
+            };
+            await _unitOfWork.SafeMovements.AddAsync(safeMovement, cancellationToken).ConfigureAwait(false);
+            await _ledger.RecordShopGoldInAsync(
+                dto.TransactionDate,
+                r.HasGram,
+                transaction.Id,
+                itemDto.Description ?? dto.Description,
+                correlationId,
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var kasaGram = itemDto.Direction == TransactionDirection.Sale ? -itemDto.Quantity : itemDto.Quantity;
+        var kasaHasGram = itemDto.Direction == TransactionDirection.Sale ? -r.HasGram : r.HasGram;
+        var safeMovementStd = new SafeMovement
+        {
+            TransactionDate = dto.TransactionDate,
+            Gram = kasaGram,
+            Milyem = itemDto.Milyem,
+            HasGram = kasaHasGram,
+            Description = itemDto.Direction == TransactionDirection.Sale
+                ? $"Satış: {itemDto.Description ?? dto.Description ?? "—"}"
+                : $"Alış: {itemDto.Description ?? dto.Description ?? "—"}",
+            MovementType = itemDto.Direction == TransactionDirection.Sale ? SafeMovementType.Expense : SafeMovementType.Income,
+            SourceTransactionId = transaction.Id,
+            CorrelationId = correlationId
+        };
+        await _unitOfWork.SafeMovements.AddAsync(safeMovementStd, cancellationToken).ConfigureAwait(false);
+
+        await _ledger.RecordTransactionAsync(
+            transactionDate: dto.TransactionDate,
+            direction: itemDto.Direction,
+            goldHasAmount: r.HasGram,
+            cashAmount: lineCash,
+            referenceId: transaction.Id,
+            customerId: dto.CustomerId,
+            description: itemDto.Description ?? dto.Description,
+            correlationId: correlationId,
+            cashCurrency: payCur,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task AppendSahisEmanetLiabilityRowsAsync(
+        Transaction tx,
+        BasketCreateDto dto,
+        Customer? customer,
+        CancellationToken cancellationToken)
+    {
+        if (!tx.IsSahisEmanet || customer?.Type != CustomerType.Sahis || dto.CustomerId == null)
+            return;
+        var desc = tx.SahisEmanetMode == SahisEmanetMode.EmanetSatis ? "Emanet satış (sepet)" : "Emanet alış (sepet)";
+        foreach (var item in tx.Items)
+        {
+            await _unitOfWork.CustomerTransactions.AddAsync(
+                new CustomerTransaction
+                {
+                    Id = Guid.NewGuid(),
+                    CustomerId = dto.CustomerId!.Value,
+                    TransactionDate = dto.TransactionDate,
+                    TransactionType = CustomerTransactionType.SahisEmanetLiability,
+                    GoldGram = 0,
+                    GoldMilyem = 0,
+                    GoldHas = item.HasGram,
+                    CashAmount = 0,
+                    CashCurrency = CashCurrency.Try,
+                    PostToLedger = false,
+                    SourceBasketTransactionId = tx.Id,
+                    Description = desc,
+                },
+                cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<TransactionDto>>> GetAll(
@@ -107,12 +255,21 @@ public class TransactionsController : ControllerBase
         if (dto.Items == null || dto.Items.Count == 0)
             return BadRequest("Sepette en az bir kalem olmalıdır.");
 
+        Customer? customer = null;
+        if (dto.CustomerId is { } custLookup)
+            customer = await _unitOfWork.Customers.GetByIdAsync(custLookup, cancellationToken).ConfigureAwait(false);
+        var validationError = ValidateSahisBasket(dto, customer);
+        if (validationError != null)
+            return BadRequest(validationError);
+
+        var stampedDto = dto with { TransactionDate = TransactionDatePrecision.ApplySavePrecisionUtc(dto.TransactionDate) };
         var correlationId = Guid.NewGuid();
 
         var transaction = new Transaction
         {
             Id = Guid.NewGuid(),
-            TransactionDate = dto.TransactionDate,
+            Kind = TransactionKind.StandardBasket,
+            TransactionDate = stampedDto.TransactionDate,
             Description = dto.Description,
             CustomerId = dto.CustomerId,
             CorrelationId = correlationId,
@@ -120,17 +277,23 @@ public class TransactionsController : ControllerBase
             Milyem = 0,
             TotalLabour = 0,
             MilyemLabour = 0,
+            IsSahisEmanet = dto.IsSahisEmanet,
+            SahisEmanetMode = (SahisEmanetMode)dto.SahisEmanetMode,
+            KasaHareketli = dto.KasaHareketli,
         };
 
         decimal totalBuyHas = 0;
         decimal totalSellHas = 0;
-        decimal totalBuyCash = 0;
-        decimal totalSellCash = 0;
+        decimal totalBuyTry = 0, totalSellTry = 0;
+        decimal totalBuyUsd = 0, totalSellUsd = 0;
+        decimal totalBuyEur = 0, totalSellEur = 0;
+        decimal totalBuyGbp = 0, totalSellGbp = 0;
 
         foreach (var itemDto in dto.Items)
         {
             var r = ResolveBasketItem(itemDto);
             var lineCash = ResolveLineCash(r.HasGram, itemDto.Price, itemDto.LineTotal);
+            var payCur = ParsePaymentCurrency(itemDto.PaymentCurrency);
 
             var item = new TransactionItem
             {
@@ -147,6 +310,7 @@ public class TransactionsController : ControllerBase
                 Description = itemDto.Description,
                 MilyemLabour = r.MilyemLabour,
                 ProductTemplateId = itemDto.ProductTemplateId,
+                PaymentCurrency = payCur,
             };
 
             transaction.Items.Add(item);
@@ -155,58 +319,55 @@ public class TransactionsController : ControllerBase
             if (itemDto.Direction == TransactionDirection.Purchase)
             {
                 totalBuyHas += r.HasGram;
-                totalBuyCash += itemCash;
+                switch (payCur)
+                {
+                    case CashCurrency.Try: totalBuyTry += itemCash; break;
+                    case CashCurrency.Usd: totalBuyUsd += itemCash; break;
+                    case CashCurrency.Eur: totalBuyEur += itemCash; break;
+                    case CashCurrency.Gbp: totalBuyGbp += itemCash; break;
+                }
             }
             else
             {
                 totalSellHas += r.HasGram;
-                totalSellCash += itemCash;
+                switch (payCur)
+                {
+                    case CashCurrency.Try: totalSellTry += itemCash; break;
+                    case CashCurrency.Usd: totalSellUsd += itemCash; break;
+                    case CashCurrency.Eur: totalSellEur += itemCash; break;
+                    case CashCurrency.Gbp: totalSellGbp += itemCash; break;
+                }
             }
 
-            // SafeMovement per item
-            var kasaGram = itemDto.Direction == TransactionDirection.Sale ? -itemDto.Quantity : itemDto.Quantity;
-            var kasaHasGram = itemDto.Direction == TransactionDirection.Sale ? -r.HasGram : r.HasGram;
-            var safeMovement = new SafeMovement
-            {
-                TransactionDate = dto.TransactionDate,
-                Gram = kasaGram,
-                Milyem = itemDto.Milyem,
-                HasGram = kasaHasGram,
-                Description = itemDto.Direction == TransactionDirection.Sale
-                    ? $"Satış: {itemDto.Description ?? dto.Description ?? "—"}"
-                    : $"Alış: {itemDto.Description ?? dto.Description ?? "—"}",
-                MovementType = itemDto.Direction == TransactionDirection.Sale ? SafeMovementType.Expense : SafeMovementType.Income,
-                SourceTransactionId = transaction.Id,
-                CorrelationId = correlationId
-            };
-            await _unitOfWork.SafeMovements.AddAsync(safeMovement, cancellationToken).ConfigureAwait(false);
-
-            // Ledger entries per item
-            await _ledger.RecordTransactionAsync(
-                transactionDate: dto.TransactionDate,
-                direction: itemDto.Direction,
-                goldHasAmount: r.HasGram,
-                cashAmount: lineCash,
-                referenceId: transaction.Id,
-                customerId: dto.CustomerId,
-                description: itemDto.Description ?? dto.Description,
-                correlationId: correlationId,
-                cancellationToken: cancellationToken
-            ).ConfigureAwait(false);
+            await PostBasketItemPhysicalAsync(transaction, stampedDto, itemDto, r, lineCash, payCur, correlationId, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         // Net values: positive = gold/cash inflow
         var netHasGram = totalBuyHas - totalSellHas;
-        var netCash = totalSellCash - totalBuyCash;
+        var netTry = totalSellTry - totalBuyTry;
+        var netUsd = totalSellUsd - totalBuyUsd;
+        var netEur = totalSellEur - totalBuyEur;
+        var netGbp = totalSellGbp - totalBuyGbp;
         transaction.NetHasGram = Math.Round(netHasGram, 6);
-        transaction.NetCashAmount = Math.Round(netCash, 6);
+        transaction.NetCashAmount = Math.Round(netTry, 6);
+        transaction.NetCashAmountUsd = Math.Round(netUsd, 6);
+        transaction.NetCashAmountEur = Math.Round(netEur, 6);
+        transaction.NetCashAmountGbp = Math.Round(netGbp, 6);
 
         // Backward-compat header fields
         transaction.Direction = netHasGram >= 0 ? TransactionDirection.Purchase : TransactionDirection.Sale;
         transaction.HasGram = Math.Round(Math.Abs(netHasGram), 6);
-        transaction.Price = Math.Round(Math.Abs(netCash), 6);
+        transaction.Price = Math.Round(Math.Abs(netTry), 6);
 
         await _unitOfWork.Transactions.AddAsync(transaction, cancellationToken).ConfigureAwait(false);
+        foreach (var item in transaction.Items)
+        {
+            if (!SkipGoldLinkingForSale(dto, item.Direction))
+                SyncGoldTransactionsForItem(item, transaction.Id, dto);
+        }
+
+        await AppendSahisEmanetLiabilityRowsAsync(transaction, stampedDto, customer, cancellationToken).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         var saved = await _unitOfWork.Transactions.GetByIdAsync(transaction.Id, cancellationToken).ConfigureAwait(false);
@@ -243,14 +404,33 @@ public class TransactionsController : ControllerBase
                 return NotFound();
             }
 
+            if (existingTransaction.Kind == TransactionKind.ForexExchange)
+            {
+                await dbTransaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+                return BadRequest("Döviz işlemleri sepet düzenleme ile değiştirilemez; silip yeniden kaydedin.");
+            }
+
+            Customer? customer = null;
+            if (dto.CustomerId is { } custLookup2)
+                customer = await _unitOfWork.Customers.GetByIdAsync(custLookup2, cancellationToken).ConfigureAwait(false);
+            var validationError = ValidateSahisBasket(dto, customer);
+            if (validationError != null)
+            {
+                await dbTransaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+                return BadRequest(validationError);
+            }
+
+            var stampedDto = dto with { TransactionDate = TransactionDatePrecision.ApplySavePrecisionUtc(dto.TransactionDate) };
             var dtoIdSet = idsInDto.ToHashSet();
             var correlationId = existingTransaction.CorrelationId ?? Guid.NewGuid();
 
-            existingTransaction.TransactionDate = dto.TransactionDate;
+            existingTransaction.TransactionDate = stampedDto.TransactionDate;
             existingTransaction.Description = dto.Description;
             existingTransaction.CustomerId = dto.CustomerId;
             existingTransaction.CorrelationId = correlationId;
-            existingTransaction.UpdatedAt = DateTime.UtcNow;
+            existingTransaction.IsSahisEmanet = dto.IsSahisEmanet;
+            existingTransaction.SahisEmanetMode = (SahisEmanetMode)dto.SahisEmanetMode;
+            existingTransaction.KasaHareketli = dto.KasaHareketli;
 
             var orphans = existingTransaction.Items.Where(i => !dtoIdSet.Contains(i.Id)).ToList();
             foreach (var orphan in orphans)
@@ -273,17 +453,17 @@ public class TransactionsController : ControllerBase
                         return BadRequest("Bu işleme ait olmayan kalem Id gönderildi.");
                     }
                     ApplyDtoToTransactionItem(entity, itemDto);
-                    SyncGoldTransactionsForItem(entity, existingTransaction.Id);
+                    SyncGoldTransactionsForItem(entity, existingTransaction.Id, dto);
                 }
                 else
                 {
                     var neu = CreateNewTransactionItemFromDto(itemDto, existingTransaction.Id);
                     existingTransaction.Items.Add(neu);
-                    SyncGoldTransactionsForItem(neu, existingTransaction.Id);
+                    SyncGoldTransactionsForItem(neu, existingTransaction.Id, dto);
                 }
             }
 
-            await RebuildMovementsAndLedgerForTransactionAsync(existingTransaction, dto, correlationId, cancellationToken).ConfigureAwait(false);
+            await RebuildMovementsAndLedgerForTransactionAsync(existingTransaction, stampedDto, correlationId, customer, cancellationToken).ConfigureAwait(false);
             RecalculateTransactionHeaderTotals(existingTransaction);
 
             await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -317,7 +497,7 @@ public class TransactionsController : ControllerBase
         entity.Description = d.Description;
         entity.MilyemLabour = r.MilyemLabour;
         entity.ProductTemplateId = d.ProductTemplateId;
-        entity.UpdatedAt = DateTime.UtcNow;
+        entity.PaymentCurrency = ParsePaymentCurrency(d.PaymentCurrency);
     }
 
     private TransactionItem CreateNewTransactionItemFromDto(BasketItemDto d, Guid transactionId)
@@ -340,14 +520,26 @@ public class TransactionsController : ControllerBase
             Description = d.Description,
             MilyemLabour = r.MilyemLabour,
             ProductTemplateId = d.ProductTemplateId,
+            PaymentCurrency = ParsePaymentCurrency(d.PaymentCurrency),
         };
     }
 
     /// <summary>
     /// Kısmi bağlama güncellemesi zaten engellendiği için RemainingGram güvenle has ile hizalanır.
     /// </summary>
-    private void SyncGoldTransactionsForItem(TransactionItem item, Guid transactionId)
+    private void SyncGoldTransactionsForItem(TransactionItem item, Guid transactionId, BasketCreateDto dto)
     {
+        if (SkipGoldLinkingForSale(dto, item.Direction))
+        {
+            var toClear = item.GoldTransactions.ToList();
+            foreach (var gt in toClear)
+            {
+                _context.GoldTransactions.Remove(gt);
+                item.GoldTransactions.Remove(gt);
+            }
+            return;
+        }
+
         var existingGt = item.GoldTransactions.ToList();
         if (item.Direction == TransactionDirection.Sale && item.HasGram > 0)
         {
@@ -394,8 +586,15 @@ public class TransactionsController : ControllerBase
         Transaction tx,
         BasketCreateDto dto,
         Guid correlationId,
+        Customer? customer,
         CancellationToken cancellationToken)
     {
+        var linkedBook = await _context.CustomerTransactions
+            .Where(c => c.SourceBasketTransactionId == tx.Id)
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        foreach (var row in linkedBook)
+            _context.CustomerTransactions.Remove(row);
+
         var movements = await _context.SafeMovements
             .Where(m => m.SourceTransactionId == tx.Id)
             .ToListAsync(cancellationToken).ConfigureAwait(false);
@@ -416,59 +615,74 @@ public class TransactionsController : ControllerBase
 
         foreach (var item in tx.Items.OrderBy(i => i.CreatedAt).ThenBy(i => i.Id))
         {
-            var kasaGram = item.Direction == TransactionDirection.Sale ? -item.Quantity : item.Quantity;
-            var kasaHasGram = item.Direction == TransactionDirection.Sale ? -item.HasGram : item.HasGram;
-            await _context.SafeMovements.AddAsync(new SafeMovement
-            {
-                TransactionDate = dto.TransactionDate,
-                Gram = kasaGram,
-                Milyem = item.Milyem,
-                HasGram = kasaHasGram,
-                Description = item.Direction == TransactionDirection.Sale
-                    ? $"Satış: {item.Description ?? dto.Description ?? "—"}"
-                    : $"Alış: {item.Description ?? dto.Description ?? "—"}",
-                MovementType = item.Direction == TransactionDirection.Sale ? SafeMovementType.Expense : SafeMovementType.Income,
-                SourceTransactionId = tx.Id,
-                CorrelationId = correlationId
-            }, cancellationToken).ConfigureAwait(false);
-
-            await _ledger.RecordTransactionAsync(
-                transactionDate: dto.TransactionDate,
-                direction: item.Direction,
-                goldHasAmount: item.HasGram,
-                cashAmount: item.Price,
-                referenceId: tx.Id,
-                customerId: dto.CustomerId,
-                description: item.Description ?? dto.Description,
-                correlationId: correlationId,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+            var itemDto = new BasketItemDto(
+                item.Id,
+                item.Direction,
+                item.Quantity,
+                item.Milyem,
+                item.PieceCount,
+                item.UnitLabour,
+                item.Price,
+                null,
+                item.Description,
+                item.ProductTemplateId,
+                (int)item.PaymentCurrency);
+            var r = ResolveBasketItem(itemDto);
+            var lineCash = item.Price ?? 0;
+            await PostBasketItemPhysicalAsync(tx, dto, itemDto, r, lineCash, item.PaymentCurrency, correlationId, cancellationToken)
+                .ConfigureAwait(false);
         }
+
+        await AppendSahisEmanetLiabilityRowsAsync(tx, dto, customer, cancellationToken).ConfigureAwait(false);
     }
 
     private static void RecalculateTransactionHeaderTotals(Transaction tx)
     {
-        decimal totalBuyHas = 0, totalSellHas = 0, totalBuyCash = 0, totalSellCash = 0;
+        decimal totalBuyHas = 0, totalSellHas = 0;
+        decimal totalBuyTry = 0, totalSellTry = 0;
+        decimal totalBuyUsd = 0, totalSellUsd = 0;
+        decimal totalBuyEur = 0, totalSellEur = 0;
+        decimal totalBuyGbp = 0, totalSellGbp = 0;
         foreach (var item in tx.Items)
         {
+            var cash = item.Price ?? 0;
             if (item.Direction == TransactionDirection.Purchase)
             {
                 totalBuyHas += item.HasGram;
-                totalBuyCash += item.Price ?? 0;
+                switch (item.PaymentCurrency)
+                {
+                    case CashCurrency.Try: totalBuyTry += cash; break;
+                    case CashCurrency.Usd: totalBuyUsd += cash; break;
+                    case CashCurrency.Eur: totalBuyEur += cash; break;
+                    case CashCurrency.Gbp: totalBuyGbp += cash; break;
+                }
             }
             else
             {
                 totalSellHas += item.HasGram;
-                totalSellCash += item.Price ?? 0;
+                switch (item.PaymentCurrency)
+                {
+                    case CashCurrency.Try: totalSellTry += cash; break;
+                    case CashCurrency.Usd: totalSellUsd += cash; break;
+                    case CashCurrency.Eur: totalSellEur += cash; break;
+                    case CashCurrency.Gbp: totalSellGbp += cash; break;
+                }
             }
         }
 
         var netHasGram = totalBuyHas - totalSellHas;
-        var netCash = totalSellCash - totalBuyCash;
+        var netTry = totalSellTry - totalBuyTry;
+        var netUsd = totalSellUsd - totalBuyUsd;
+        var netEur = totalSellEur - totalBuyEur;
+        var netGbp = totalSellGbp - totalBuyGbp;
         tx.NetHasGram = Math.Round(netHasGram, 6);
-        tx.NetCashAmount = Math.Round(netCash, 6);
+        tx.NetCashAmount = Math.Round(netTry, 6);
+        tx.NetCashAmountUsd = Math.Round(netUsd, 6);
+        tx.NetCashAmountEur = Math.Round(netEur, 6);
+        tx.NetCashAmountGbp = Math.Round(netGbp, 6);
         tx.Direction = netHasGram >= 0 ? TransactionDirection.Purchase : TransactionDirection.Sale;
         tx.HasGram = Math.Round(Math.Abs(netHasGram), 6);
-        tx.Price = Math.Round(Math.Abs(netCash), 6);
+        tx.Price = Math.Round(Math.Abs(netTry), 6);
         tx.Quantity = 0;
         tx.Milyem = 0;
     }
@@ -482,43 +696,59 @@ public class TransactionsController : ControllerBase
         if (await _goldLinking.HasPartialLinkForTransactionAsync(id, cancellationToken).ConfigureAwait(false))
             return BadRequest("Bu işlemde kısmi FIFO nakit bağlantısı var; işlem silinemez.");
 
-        if (transaction.CorrelationId.HasValue
-            && !transaction.Items.Any()
-            && transaction.CashAmount.HasValue)
+        await using var dbTx = await _context.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            await _cashPegging.RestoreHybridPeggingFifoAsync(transaction.CorrelationId.Value, cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        await _goldLinking.RemoveGoldTransactionsForTransactionAsync(id, cancellationToken).ConfigureAwait(false);
-
-        // Find SafeMovements by SourceTransactionId
-        var allMovements = await _unitOfWork.SafeMovements.GetAllAsync(cancellationToken).ConfigureAwait(false);
-        var relatedBySource = allMovements.Where(m => m.SourceTransactionId == id).ToList();
-        foreach (var m in relatedBySource)
-            _unitOfWork.SafeMovements.Delete(m);
-
-        // Also find SafeMovements by CorrelationId (catches ProfitRealization entries)
-        if (transaction.CorrelationId.HasValue)
-        {
-            var relatedByCorrelation = await _unitOfWork.SafeMovements
-                .FindByCorrelationIdAsync(transaction.CorrelationId.Value, cancellationToken).ConfigureAwait(false);
-            foreach (var m in relatedByCorrelation)
+            if (transaction.CorrelationId.HasValue
+                && !transaction.Items.Any()
+                && transaction.CashAmount.HasValue)
             {
-                if (relatedBySource.All(r => r.Id != m.Id))
-                    _unitOfWork.SafeMovements.Delete(m);
+                await _cashPegging.RestoreHybridPeggingFifoAsync(transaction.CorrelationId.Value, cancellationToken)
+                    .ConfigureAwait(false);
             }
 
-            await _ledger.DeleteEntriesByCorrelationAsync(transaction.CorrelationId.Value, cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            await _ledger.DeleteEntriesByReferenceAsync(LedgerReferenceType.Transaction, id, cancellationToken).ConfigureAwait(false);
-        }
+            await _goldLinking.RemoveGoldTransactionsForTransactionAsync(id, cancellationToken).ConfigureAwait(false);
 
-        _unitOfWork.Transactions.Delete(transaction);
-        await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return NoContent();
+            var linkedBookRows = await _context.CustomerTransactions
+                .Where(c => c.SourceBasketTransactionId == id)
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            foreach (var row in linkedBookRows)
+                _unitOfWork.CustomerTransactions.Delete(row);
+
+            // Find SafeMovements by SourceTransactionId
+            var allMovements = await _unitOfWork.SafeMovements.GetAllAsync(cancellationToken).ConfigureAwait(false);
+            var relatedBySource = allMovements.Where(m => m.SourceTransactionId == id).ToList();
+            foreach (var m in relatedBySource)
+                _unitOfWork.SafeMovements.Delete(m);
+
+            // Also find SafeMovements by CorrelationId (catches ProfitRealization entries)
+            if (transaction.CorrelationId.HasValue)
+            {
+                var relatedByCorrelation = await _unitOfWork.SafeMovements
+                    .FindByCorrelationIdAsync(transaction.CorrelationId.Value, cancellationToken).ConfigureAwait(false);
+                foreach (var m in relatedByCorrelation)
+                {
+                    if (relatedBySource.All(r => r.Id != m.Id))
+                        _unitOfWork.SafeMovements.Delete(m);
+                }
+
+                await _ledger.DeleteEntriesByCorrelationAsync(transaction.CorrelationId.Value, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await _ledger.DeleteEntriesByReferenceAsync(LedgerReferenceType.Transaction, id, cancellationToken).ConfigureAwait(false);
+            }
+
+            _unitOfWork.Transactions.Delete(transaction);
+            await _unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await dbTx.CommitAsync(cancellationToken).ConfigureAwait(false);
+            return NoContent();
+        }
+        catch
+        {
+            await dbTx.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            throw;
+        }
     }
 
     // ── DTO mapping ──
@@ -528,9 +758,16 @@ public class TransactionsController : ControllerBase
         return new TransactionDto(
             Id: tx.Id,
             TransactionDate: tx.TransactionDate,
+            Kind: tx.Kind,
             Direction: tx.Direction,
+            IsSahisEmanet: tx.IsSahisEmanet,
+            SahisEmanetMode: (int)tx.SahisEmanetMode,
+            KasaHareketli: tx.KasaHareketli,
             NetHasGram: tx.NetHasGram,
             NetCashAmount: tx.NetCashAmount,
+            NetCashAmountUsd: tx.NetCashAmountUsd,
+            NetCashAmountEur: tx.NetCashAmountEur,
+            NetCashAmountGbp: tx.NetCashAmountGbp,
             HasGram: tx.HasGram,
             Price: tx.Price,
             CashAmount: tx.CashAmount,
@@ -539,6 +776,11 @@ public class TransactionsController : ControllerBase
             CustomerId: tx.CustomerId,
             CustomerName: tx.Customer?.Name,
             CorrelationId: tx.CorrelationId,
+            ForexBaseCurrency: tx.ForexBaseCurrency,
+            ForexIsBuy: tx.ForexIsBuy,
+            ForexAmountBase: tx.ForexAmountBase,
+            ForexRateTryPerUnit: tx.ForexRateTryPerUnit,
+            ForexCounterTry: tx.ForexCounterTry,
             CreatedAt: tx.CreatedAt,
             Items: tx.Items.Select(i => new TransactionItemDto(
                 Id: i.Id,
@@ -552,7 +794,8 @@ public class TransactionsController : ControllerBase
                 Price: i.Price,
                 Description: i.Description,
                 MilyemLabour: i.MilyemLabour,
-                ProductTemplateId: i.ProductTemplateId
+                ProductTemplateId: i.ProductTemplateId,
+                PaymentCurrency: i.PaymentCurrency
             )).ToList()
         );
     }
@@ -564,7 +807,10 @@ public record BasketCreateDto(
     DateTime TransactionDate,
     string? Description,
     Guid? CustomerId,
-    List<BasketItemDto> Items
+    List<BasketItemDto> Items,
+    bool IsSahisEmanet = false,
+    int SahisEmanetMode = 0,
+    bool KasaHareketli = true
 );
 
 public record BasketItemDto(
@@ -577,15 +823,24 @@ public record BasketItemDto(
     decimal? Price,
     decimal? LineTotal,
     string? Description,
-    Guid? ProductTemplateId
+    Guid? ProductTemplateId,
+    /// <summary>0=TL, 1=USD, 2=EUR, 3=GBP</summary>
+    int? PaymentCurrency
 );
 
 public record TransactionDto(
     Guid Id,
     DateTime TransactionDate,
+    TransactionKind Kind,
     TransactionDirection Direction,
+    bool IsSahisEmanet,
+    int SahisEmanetMode,
+    bool KasaHareketli,
     decimal NetHasGram,
     decimal NetCashAmount,
+    decimal NetCashAmountUsd,
+    decimal NetCashAmountEur,
+    decimal NetCashAmountGbp,
     decimal HasGram,
     decimal? Price,
     decimal? CashAmount,
@@ -594,6 +849,11 @@ public record TransactionDto(
     Guid? CustomerId,
     string? CustomerName,
     Guid? CorrelationId,
+    CashCurrency? ForexBaseCurrency,
+    bool? ForexIsBuy,
+    decimal? ForexAmountBase,
+    decimal? ForexRateTryPerUnit,
+    decimal? ForexCounterTry,
     DateTime CreatedAt,
     List<TransactionItemDto> Items
 );
@@ -610,5 +870,6 @@ public record TransactionItemDto(
     decimal? Price,
     string? Description,
     decimal MilyemLabour,
-    Guid? ProductTemplateId
+    Guid? ProductTemplateId,
+    CashCurrency PaymentCurrency
 );

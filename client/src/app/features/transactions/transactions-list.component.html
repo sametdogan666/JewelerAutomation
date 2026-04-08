@@ -78,7 +78,10 @@
         <ng-container matColumnDef="itemCount">
           <th mat-header-cell *matHeaderCellDef>Kalem</th>
           <td mat-cell *matCellDef="let row">
-            <span class="item-count-badge" [class.item-count-badge--pegging]="isNakitBaglamaRow(row)">
+            <span
+              class="item-count-badge"
+              [class.item-count-badge--pegging]="isNakitBaglamaRow(row)"
+              [class.item-count-badge--forex]="isForexRow(row)">
               {{ itemCountLabel(row) }}
             </span>
           </td>
@@ -89,9 +92,10 @@
           <th mat-header-cell *matHeaderCellDef>Net Yön</th>
           <td mat-cell *matCellDef="let row">
             <span class="badge" [ngClass]="{
-              'badge-sale': !isNakitBaglamaRow(row) && row.netHasGram < 0,
-              'badge-purchase': !isNakitBaglamaRow(row) && row.netHasGram > 0,
-              'badge-neutral': !isNakitBaglamaRow(row) && row.netHasGram === 0,
+              'badge-forex': isForexRow(row),
+              'badge-sale': !isForexRow(row) && !isNakitBaglamaRow(row) && row.netHasGram < 0,
+              'badge-purchase': !isForexRow(row) && !isNakitBaglamaRow(row) && row.netHasGram > 0,
+              'badge-neutral': !isForexRow(row) && !isNakitBaglamaRow(row) && row.netHasGram === 0,
               'badge-pegging': isNakitBaglamaRow(row)
             }">
               {{ netLabel(row) }}
@@ -103,10 +107,12 @@
         <ng-container matColumnDef="netHasGram">
           <th mat-header-cell *matHeaderCellDef>Net Has Gr</th>
           <td mat-cell *matCellDef="let row" [ngClass]="{
-            'text-positive': isNakitBaglamaRow(row) || row.netHasGram > 0,
-            'text-negative': !isNakitBaglamaRow(row) && row.netHasGram < 0
+            'text-positive': !isForexRow(row) && (isNakitBaglamaRow(row) || row.netHasGram > 0),
+            'text-negative': !isForexRow(row) && !isNakitBaglamaRow(row) && row.netHasGram < 0
           }">
-            @if (isNakitBaglamaRow(row)) {
+            @if (isForexRow(row)) {
+              <span class="text-muted">—</span>
+            } @else if (isNakitBaglamaRow(row)) {
               +{{ peggingEquivalentHasGram(row) | number:'1.2-2' }}
             } @else {
               {{ row.netHasGram > 0 ? '+' : '' }}{{ row.netHasGram | number:'1.2-2' }}
@@ -114,18 +120,19 @@
           </td>
         </ng-container>
 
-        <!-- Net Nakit -->
+        <!-- Net Nakit (TRY / USD / EUR / GBP ayrı satırlar, sembol ile) -->
         <ng-container matColumnDef="netCashAmount">
-          <th mat-header-cell *matHeaderCellDef>Net Nakit (₺)</th>
-          <td mat-cell *matCellDef="let row" [ngClass]="{
-            'text-positive': !isNakitBaglamaRow(row) && row.netCashAmount > 0,
-            'text-negative': isNakitBaglamaRow(row) || (!isNakitBaglamaRow(row) && row.netCashAmount < 0)
-          }">
+          <th mat-header-cell *matHeaderCellDef>Net Nakit</th>
+          <td mat-cell *matCellDef="let row">
             @if (isNakitBaglamaRow(row)) {
               <span class="peg-cash">{{ peggingNetCashSigned(row) | number:'1.2-2' }} ₺</span>
               <span class="peg-cash-hint">net nakit (kasadan)</span>
-            } @else if (row.netCashAmount != null && row.netCashAmount !== 0) {
-              {{ row.netCashAmount > 0 ? '+' : '' }}{{ row.netCashAmount | number:'1.0-0' }} ₺
+            } @else if (hasAnyNetCash(row)) {
+              <div class="net-cash-stack">
+                @for (line of netCashLines(row); track line) {
+                  <div [ngClass]="netCashLineClass(line)">{{ line }}</div>
+                }
+              </div>
             } @else {
               <span class="text-muted">—</span>
             }
@@ -148,7 +155,12 @@
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef class="actions-header">İşlemler</th>
           <td mat-cell *matCellDef="let row" class="actions-cell">
-            <button mat-icon-button type="button" (click)="toggleExpand(row)" matTooltip="Kalemleri göster">
+            <button
+              mat-icon-button
+              type="button"
+              (click)="toggleExpand(row)"
+              [disabled]="!hasExpandableDetail(row)"
+              [matTooltip]="isForexRow(row) ? 'Döviz detayı' : 'Kalemleri göster'">
               <mat-icon>{{ expandedRow() === row.id ? 'expand_less' : 'expand_more' }}</mat-icon>
             </button>
             <button
@@ -163,9 +175,11 @@
                 <mat-icon>receipt_long</mat-icon>
               }
             </button>
-            <button mat-icon-button color="primary" [routerLink]="['/transactions', row.id, 'edit']" matTooltip="Düzenle" type="button">
-              <mat-icon>edit</mat-icon>
-            </button>
+            @if (!isForexRow(row)) {
+              <button mat-icon-button color="primary" [routerLink]="['/transactions', row.id, 'edit']" matTooltip="Düzenle" type="button">
+                <mat-icon>edit</mat-icon>
+              </button>
+            }
             <button mat-icon-button color="warn" (click)="onDelete(row)" [disabled]="deleting() === row.id" matTooltip="Sil" type="button">
               @if (deleting() === row.id) {
                 <mat-icon>hourglass_empty</mat-icon>
@@ -179,7 +193,30 @@
         <!-- Expanded Detail Row -->
         <ng-container matColumnDef="expandedDetail">
           <td mat-cell *matCellDef="let row" [attr.colspan]="displayedColumns.length">
-            @if (expandedRow() === row.id && row.items?.length > 0) {
+            @if (expandedRow() === row.id && isForexRow(row)) {
+              <div class="expanded-detail expanded-detail--forex">
+                <div class="forex-detail-title">Döviz İşlemi</div>
+                <dl class="forex-detail-dl">
+                  <dt>Para</dt>
+                  <dd>{{ forexBaseCode(row) }} ({{ forexBaseSymbol(row) }})</dd>
+                  <dt>İşlem</dt>
+                  <dd>{{ forexActionTr(row) }}</dd>
+                  <dt>Tutar</dt>
+                  <dd>{{ row.forexAmountBase | number:'1.2-2' }} {{ forexBaseSymbol(row) }}</dd>
+                  <dt>Kur (₺ / 1 {{ forexBaseCode(row) }})</dt>
+                  <dd>{{ row.forexRateTryPerUnit | number:'1.4-4' }}</dd>
+                  <dt>TRY karşılığı</dt>
+                  <dd>
+                    @if (row.forexCounterTry != null) {
+                      {{ row.forexIsBuy ? '−' : '+' }}{{ row.forexCounterTry | number:'1.2-2' }} ₺
+                    } @else { — }
+                  </dd>
+                </dl>
+                @if (row.description) {
+                  <p class="forex-detail-desc">{{ row.description }}</p>
+                }
+              </div>
+            } @else if (expandedRow() === row.id && row.items?.length > 0) {
               <div class="expanded-detail">
                 <table class="detail-table">
                   <thead>
@@ -227,6 +264,7 @@
         <tr mat-row *matRowDef="let row; columns: displayedColumns"
             class="table-row"
             [class.table-row--pegging]="isNakitBaglamaRow(row)"
+            [class.table-row--forex]="isForexRow(row)"
             [class.expanded-row]="expandedRow() === row.id"></tr>
         <tr mat-row *matRowDef="let row; columns: ['expandedDetail']"
             class="detail-row"

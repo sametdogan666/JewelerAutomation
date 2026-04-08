@@ -1,6 +1,6 @@
 using JewelerAutomation.Core.Entities;
 
-namespace JewelerAutomation.Application.Services;
+namespace JewelerAutomation.Application.Interfaces;
 
 public interface ICashPeggingService
 {
@@ -44,7 +44,7 @@ public interface ICashPeggingService
 }
 
 /// <summary>
-/// Dönem işlem açığı T = satış has − alış has. Kasada kalan nakit R, bu bağlamada kullanılan C.
+/// Dönem işlem açığı T = satış has − alış has. Kasada kalan nakit R, bu bağlamda kullanılan C.
 /// S = C/P + R/P (tüm kasa nakdinin seçilen fiyattaki has karşılığı). Kısmi bağlamada:
 ///   toplam net = S − T; mühürlenen = E×(S−T)/S; bekleyen = R_h×(S−T)/S (S&gt;0).
 /// </summary>

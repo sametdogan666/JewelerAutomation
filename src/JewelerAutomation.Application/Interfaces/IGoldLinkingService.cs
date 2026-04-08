@@ -1,6 +1,6 @@
 using JewelerAutomation.Core.Entities;
 
-namespace JewelerAutomation.Application.Services;
+namespace JewelerAutomation.Application.Interfaces;
 
 public record FifoLinkingSimulationResult(
     decimal TargetAmountGram,

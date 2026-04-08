@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using JewelerAutomation.Application.Interfaces;
-using JewelerAutomation.Application.Services;
 using JewelerAutomation.Core.Entities;
 
 namespace JewelerAutomation.WebAPI.Controllers;

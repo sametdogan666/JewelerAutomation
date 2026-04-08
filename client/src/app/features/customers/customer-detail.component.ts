@@ -10,6 +10,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule, MatTableDataSource } from '@angular/material/table';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatRadioModule } from '@angular/material/radio';
 import { DecimalPipe } from '@angular/common';
 import { CustomersService, Customer } from '../../core/services/customers.service';
 import { NotificationService } from '../../core/services/notification.service';
@@ -17,9 +18,10 @@ import { DashboardRefreshService } from '../../core/services/dashboard-refresh.s
 import {
   CustomerAccountService,
   CustomerBalance,
-  CustomerTransactionDto,
+  CustomerStatementEntryDto,
   CustomerTransactionType,
   CreateCustomerTransactionRequest,
+  SahisOpeningBalanceRequest,
 } from '../../core/services/customer-account.service';
 
 const TRANSACTION_TYPES: { value: CustomerTransactionType; label: string }[] = [
@@ -44,6 +46,7 @@ const TRANSACTION_TYPES: { value: CustomerTransactionType; label: string }[] = [
     MatTableModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
+    MatRadioModule,
     DecimalPipe,
   ],
   templateUrl: './customer-detail.component.html',
@@ -59,14 +62,26 @@ export class CustomerDetailComponent implements OnInit {
 
   customer = signal<Customer | null>(null);
   balance = signal<CustomerBalance | null>(null);
-  statement = signal<CustomerTransactionDto[]>([]);
+  statement = signal<CustomerStatementEntryDto[]>([]);
   loading = signal(true);
   saving = signal(false);
+  savingOpening = signal(false);
   showTransactionForm = signal(false);
 
-  dataSource = new MatTableDataSource<CustomerTransactionDto>([]);
-  displayedColumns = ['transactionDate', 'transactionType', 'goldHas', 'cashAmount', 'description', 'actions'];
+  dataSource = new MatTableDataSource<CustomerStatementEntryDto>([]);
+  displayedColumns = [
+    'transactionDate',
+    'transactionType',
+    'goldHas',
+    'milyem',
+    'netCash',
+    'description',
+    'basket',
+    'detail',
+    'actions',
+  ];
   deleting = signal<string | null>(null);
+  expandedEntryId = signal<string | null>(null);
 
   transactionTypes = TRANSACTION_TYPES;
   customerId = computed(() => this.route.snapshot.paramMap.get('id'));
@@ -77,8 +92,25 @@ export class CustomerDetailComponent implements OnInit {
     goldGram: [0],
     goldMilyem: [916],
     cashAmount: [0],
+    cashCurrency: [0],
     description: [''],
   });
+
+  openingForm = this.fb.nonNullable.group({
+    transactionDate: [new Date().toISOString().slice(0, 10), Validators.required],
+    assetKind: [0, Validators.required],
+    amount: [0, [Validators.required, Validators.min(0.000001)]],
+    customerIsCreditor: [true],
+    description: [''],
+  });
+
+  openingAssetOptions = [
+    { value: 0, label: 'Altın (Has gr)' },
+    { value: 1, label: 'TL' },
+    { value: 2, label: 'USD' },
+    { value: 3, label: 'EUR' },
+    { value: 4, label: 'GBP' },
+  ] as const;
 
   get isGoldTransaction(): boolean {
     const t = this.form.get('transactionType')?.value;
@@ -111,6 +143,7 @@ export class CustomerDetailComponent implements OnInit {
       next: (list) => {
         this.statement.set(list);
         this.dataSource.data = list;
+        this.expandedEntryId.set(null);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
@@ -118,11 +151,40 @@ export class CustomerDetailComponent implements OnInit {
   }
 
   transactionTypeLabel(type: CustomerTransactionType): string {
+    if (type === 20) return 'Eski bakiye (devir)';
+    if (type === 21) return 'Emanet (sepet)';
     return TRANSACTION_TYPES.find((t) => t.value === type)?.label ?? '';
+  }
+
+  cashSuffix(cur: number): string {
+    if (cur === 1) return 'USD';
+    if (cur === 2) return 'EUR';
+    if (cur === 3) return 'GBP';
+    return '₺';
   }
 
   formatDate(s: string): string {
     return new Date(s).toLocaleDateString('tr-TR');
+  }
+
+  formatNetCashLine(row: CustomerStatementEntryDto): string {
+    const parts: string[] = [];
+    const n = (x: number) =>
+      x.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (row.netCashTry !== 0) parts.push(`${n(row.netCashTry)} ₺`);
+    if (row.netCashUsd !== 0) parts.push(`${n(row.netCashUsd)} USD`);
+    if (row.netCashEur !== 0) parts.push(`${n(row.netCashEur)} EUR`);
+    if (row.netCashGbp !== 0) parts.push(`${n(row.netCashGbp)} GBP`);
+    return parts.length > 0 ? parts.join(' · ') : '—';
+  }
+
+  toggleBasketDetail(row: CustomerStatementEntryDto): void {
+    if (!row.isBasketGroup || !row.lineItems?.length) return;
+    this.expandedEntryId.update((id) => (id === row.entryId ? null : row.entryId));
+  }
+
+  isDetailExpanded(row: CustomerStatementEntryDto): boolean {
+    return this.expandedEntryId() === row.entryId;
   }
 
   toggleTransactionForm(): void {
@@ -141,6 +203,8 @@ export class CustomerDetailComponent implements OnInit {
       goldHas: 0,
       cashAmount: this.isCashTransaction ? v.cashAmount : 0,
       description: v.description || undefined,
+      cashCurrency: Math.round(Number(v.cashCurrency ?? 0)),
+      postToLedger: true,
     };
     this.saving.set(true);
     this.accountApi.createTransaction(id, dto).subscribe({
@@ -152,6 +216,7 @@ export class CustomerDetailComponent implements OnInit {
           goldGram: 0,
           goldMilyem: 916,
           cashAmount: 0,
+          cashCurrency: 0,
           description: '',
         });
         this.showTransactionForm.set(false);
@@ -161,13 +226,15 @@ export class CustomerDetailComponent implements OnInit {
     });
   }
 
-  async onDeleteTransaction(transaction: CustomerTransactionDto): Promise<void> {
-    const label = this.transactionTypeLabel(transaction.transactionType);
+  async onDeleteStatementRow(row: CustomerStatementEntryDto): Promise<void> {
+    if (!row.canDelete || !row.primaryTransactionId) return;
+    const label = this.transactionTypeLabel(row.transactionType);
     const confirmed = await this.notify.confirmDelete(`"${label}" işlemini silmek istediğinize emin misiniz?`);
     if (!confirmed) return;
 
-    this.deleting.set(transaction.id);
-    this.accountApi.deleteTransaction(transaction.id).subscribe({
+    const tid = row.primaryTransactionId;
+    this.deleting.set(tid);
+    this.accountApi.deleteTransaction(tid).subscribe({
       next: () => {
         this.deleting.set(null);
         this.notify.success('İşlem silindi');
@@ -181,6 +248,39 @@ export class CustomerDetailComponent implements OnInit {
         this.deleting.set(null);
         this.notify.error('Silme Hatası', 'Hareket silinirken bir hata oluştu.');
       }
+    });
+  }
+
+  onSubmitOpening(): void {
+    const id = this.customerId();
+    if (!id || this.customer()?.type !== 1 || this.openingForm.invalid || this.savingOpening()) return;
+    const v = this.openingForm.getRawValue();
+    const dto: SahisOpeningBalanceRequest = {
+      transactionDate: new Date(v.transactionDate).toISOString(),
+      assetKind: v.assetKind,
+      amount: Number(v.amount),
+      customerIsCreditor: v.customerIsCreditor,
+      description: v.description || undefined,
+    };
+    this.savingOpening.set(true);
+    this.accountApi.postSahisOpeningBalance(id, dto).subscribe({
+      next: () => {
+        this.savingOpening.set(false);
+        this.openingForm.reset({
+          transactionDate: new Date().toISOString().slice(0, 10),
+          assetKind: 0,
+          amount: 0,
+          customerIsCreditor: true,
+          description: '',
+        });
+        this.loadAccount(id);
+        this.refreshService.triggerRefresh();
+        this.notify.success('Devir kaydı oluşturuldu');
+      },
+      error: () => {
+        this.savingOpening.set(false);
+        this.notify.error('Hata', 'Devir kaydı eklenemedi.');
+      },
     });
   }
 }

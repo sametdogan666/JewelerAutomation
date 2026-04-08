@@ -24,14 +24,22 @@ export interface SafeMovementCreate {
 export interface SafeStatus {
   physicalGoldBalance: number;
   physicalCashBalance: number;
+  physicalCashBalanceUsd: number;
+  physicalCashBalanceEur: number;
+  physicalCashBalanceGbp: number;
   expectedGold: number;
   goldGapOrSurplus: number;
   customerGoldDebt: number;
   customerGoldReceivable: number;
   personalGoldDebt: number;
   personalGoldReceivable: number;
+  sahisGoldLiabilitiesHasGram: number;
+  netPhysicalEquityHasGram: number;
   netGoldPosition: number;
   netCashPosition: number;
+  netCashPositionUsd: number;
+  netCashPositionEur: number;
+  netCashPositionGbp: number;
   profitHasGram: number;
   cumulativePeggingProfitHasGram: number;
   peggingCount: number;

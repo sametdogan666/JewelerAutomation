@@ -8,6 +8,9 @@ public class Transaction : BaseEntity
 {
     public DateTime TransactionDate { get; set; }
 
+    /// <summary>Varsayılan sepet; <see cref="TransactionKind.ForexExchange"/> saf döviz işlemi.</summary>
+    public TransactionKind Kind { get; set; }
+
     /// <summary>
     /// Net yön: Sepetteki toplam altın pozitifse Purchase, negatifse Sale.
     /// Eski tek-kalemli kayıtlarda orijinal yön korunur.
@@ -45,9 +48,30 @@ public class Transaction : BaseEntity
     public decimal NetHasGram { get; set; }
 
     /// <summary>
-    /// İşaretli net nakit: Pozitif = kasaya nakit giriş, Negatif = kasadan nakit çıkış.
+    /// İşaretli net nakit (TL): Pozitif = kasaya giriş, Negatif = kasadan çıkış.
     /// </summary>
     public decimal NetCashAmount { get; set; }
+
+    /// <summary>Sepet net nakit (USD), aynı işaret kuralı.</summary>
+    public decimal NetCashAmountUsd { get; set; }
+
+    /// <summary>Sepet net nakit (EUR), aynı işaret kuralı.</summary>
+    public decimal NetCashAmountEur { get; set; }
+
+    /// <summary>Sepet net nakit (GBP), aynı işaret kuralı.</summary>
+    public decimal NetCashAmountGbp { get; set; }
+
+    // ── Döviz (Borsa) — yalnızca Kind == ForexExchange ──
+
+    /// <summary>İşlem dövizi (USD/EUR/GBP).</summary>
+    public CashCurrency? ForexBaseCurrency { get; set; }
+
+    /// <summary>True: döviz alındı (TRY kasadan çıkar); False: döviz satıldı (TRY kasaya girer).</summary>
+    public bool? ForexIsBuy { get; set; }
+
+    public decimal? ForexAmountBase { get; set; }
+    public decimal? ForexRateTryPerUnit { get; set; }
+    public decimal? ForexCounterTry { get; set; }
 
     /// <summary>
     /// Nakit bağlama işleminde bağlanan toplam nakit (TL), pozitif tutar. Diğer kayıtlarda null.
@@ -63,6 +87,15 @@ public class Transaction : BaseEntity
     /// Sepetteki kalemler (master-detail).
     /// </summary>
     public ICollection<TransactionItem> Items { get; set; } = new List<TransactionItem>();
+
+    /// <summary>Şahıs emanet sepeti; yalnız <see cref="CustomerType.Sahis"/> ile geçerli.</summary>
+    public bool IsSahisEmanet { get; set; }
+
+    /// <summary><see cref="SahisEmanetMode.EmanetSatis"/> veya <see cref="SahisEmanetMode.EmanetAlis"/>.</summary>
+    public SahisEmanetMode SahisEmanetMode { get; set; }
+
+    /// <summary>False: kasa hareketi ve defter satırları oluşturulmaz (kayıt amaçlı); emanet+şahısta yükümlülük satırı yazılabilir.</summary>
+    public bool KasaHareketli { get; set; } = true;
 }
 
 public enum TransactionDirection

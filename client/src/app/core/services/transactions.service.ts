@@ -4,6 +4,12 @@ import { ApiService } from './api.service';
 
 export type TransactionDirection = 0 | 1; // 0 Sale, 1 Purchase
 
+/** API: 0=TL, 1=USD, 2=EUR, 3=GBP */
+export type PaymentCurrency = 0 | 1 | 2 | 3;
+
+/** 0=sepet, 1=döviz (Borsa) */
+export type TransactionKind = 0 | 1;
+
 export interface TransactionItem {
   id: string;
   direction: TransactionDirection;
@@ -17,14 +23,23 @@ export interface TransactionItem {
   description?: string;
   milyemLabour: number;
   productTemplateId?: string | null;
+  paymentCurrency?: PaymentCurrency;
 }
 
 export interface Transaction {
   id: string;
   transactionDate: string;
+  kind?: TransactionKind;
   direction: TransactionDirection;
+  isSahisEmanet?: boolean;
+  /** 1=emanet satış, 2=emanet alış */
+  sahisEmanetMode?: number;
+  kasaHareketli?: boolean;
   netHasGram: number;
   netCashAmount: number;
+  netCashAmountUsd?: number;
+  netCashAmountEur?: number;
+  netCashAmountGbp?: number;
   hasGram: number;
   price?: number;
   /** Nakit bağlama: bağlanan TL (pozitif tutar, API). */
@@ -37,6 +52,11 @@ export interface Transaction {
   correlationId?: string;
   createdAt: string;
   items: TransactionItem[];
+  forexBaseCurrency?: number;
+  forexIsBuy?: boolean;
+  forexAmountBase?: number;
+  forexRateTryPerUnit?: number;
+  forexCounterTry?: number;
 }
 
 export interface BasketItemCreate {
@@ -53,6 +73,8 @@ export interface BasketItemCreate {
   lineTotal?: number;
   description?: string;
   productTemplateId?: string | null;
+  /** 0=TL, 1=USD, 2=EUR */
+  paymentCurrency?: PaymentCurrency;
 }
 
 export interface BasketCreate {
@@ -60,6 +82,9 @@ export interface BasketCreate {
   description?: string;
   customerId?: string;
   items: BasketItemCreate[];
+  isSahisEmanet?: boolean;
+  sahisEmanetMode?: number;
+  kasaHareketli?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })

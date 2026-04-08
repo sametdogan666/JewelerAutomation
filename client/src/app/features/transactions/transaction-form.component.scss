@@ -138,10 +138,10 @@
   display: grid;
   /* Tür | Şablon (geniş) | Gr | Milyem | Adet | B. işçilik | … */
   grid-template-columns:
-    100px minmax(220px, 2.5fr) 100px 88px 72px 92px 108px 82px 92px minmax(120px, 1.2fr) 44px;
+    100px minmax(220px, 2.5fr) 100px 88px 72px 92px 76px 108px 82px 92px minmax(120px, 1.2fr) 44px;
   gap: 4px;
   align-items: center;
-  min-width: 1180px;
+  min-width: 1260px;
 }
 
 .grid-header {
@@ -485,9 +485,25 @@
     padding: 0.5rem 0;
   }
 
+  &.summary-row--cash-stack {
+    align-items: flex-start;
+  }
+
   .summary-value--large {
     font-size: 1.125rem;
     font-weight: 700;
+  }
+}
+
+.summary-cash-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  text-align: right;
+
+  &.summary-cash-stack--net .summary-value--large {
+    font-size: 1rem;
   }
 }
 

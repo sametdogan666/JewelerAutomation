@@ -34,6 +34,24 @@ public class DashboardRawSummaryService : IDashboardSummaryService
         && tx.CashAmount.HasValue
         && tx.EquivalentHasGram.HasValue;
 
+    private static IReadOnlyList<PhysicalVaultHistoryPointDto> BuildPhysicalVaultHistory(IEnumerable<SafeMovement> movements)
+    {
+        var ordered = movements
+            .OrderBy(m => m.TransactionDate)
+            .ThenBy(m => m.CreatedAt)
+            .ThenBy(m => m.Id)
+            .ToList();
+        decimal cum = 0;
+        var list = new List<PhysicalVaultHistoryPointDto>(ordered.Count);
+        foreach (var m in ordered)
+        {
+            cum += SafeMovementPhysicalVault.GetSignedHasGramContribution(m);
+            list.Add(new PhysicalVaultHistoryPointDto(m.TransactionDate, Math.Round(cum, 6)));
+        }
+
+        return list;
+    }
+
     public async Task<DashboardSummaryDto> GetSummaryAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -54,7 +72,13 @@ public class DashboardRawSummaryService : IDashboardSummaryService
     private async Task<DashboardSummaryDto> BuildAsync(CancellationToken cancellationToken)
     {
         var ledgerGold = await _uow.Ledger.GetGoldBalanceAsync(cancellationToken).ConfigureAwait(false);
-        var ledgerCash = await _uow.Ledger.GetCashBalanceAsync(cancellationToken).ConfigureAwait(false);
+        var physicalVaultGold = await _uow.SafeMovements
+            .GetPhysicalVaultNetHasGramAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var ledgerCashTry = await _uow.Ledger.GetCashBalanceForCurrencyAsync(CashCurrency.Try, cancellationToken).ConfigureAwait(false);
+        var ledgerCashUsd = await _uow.Ledger.GetCashBalanceForCurrencyAsync(CashCurrency.Usd, cancellationToken).ConfigureAwait(false);
+        var ledgerCashEur = await _uow.Ledger.GetCashBalanceForCurrencyAsync(CashCurrency.Eur, cancellationToken).ConfigureAwait(false);
+        var ledgerCashGbp = await _uow.Ledger.GetCashBalanceForCurrencyAsync(CashCurrency.Gbp, cancellationToken).ConfigureAwait(false);
 
         var allMovements = await _uow.SafeMovements.GetAllAsync(cancellationToken).ConfigureAwait(false);
         var transactions = await _uow.Transactions.GetAllAsync(cancellationToken).ConfigureAwait(false);
@@ -67,65 +91,26 @@ public class DashboardRawSummaryService : IDashboardSummaryService
             transactionNetHasSum += tx.NetHasGram;
         }
 
-        decimal capitalGold = 0;
-        foreach (var sm in allMovements)
-        {
-            if (sm.SourceTransactionId.HasValue)
-                continue;
-            capitalGold += sm.MovementType switch
-            {
-                SafeMovementType.Capital => sm.HasGram,
-                SafeMovementType.Income => sm.HasGram,
-                SafeMovementType.Expense => -Math.Abs(sm.HasGram),
-                SafeMovementType.Transfer => sm.HasGram,
-                SafeMovementType.ProfitRealization => 0m,
-                SafeMovementType.LinkingProfit => 0m,
-                _ => 0m
-            };
-        }
-
-        decimal tradingPurchases = 0, tradingSales = 0;
-        foreach (var tx in transactions)
-        {
-            if (IsHybridPeggingTransaction(tx))
-                continue;
-
-            if (tx.Items.Any())
-            {
-                foreach (var item in tx.Items)
-                {
-                    if (item.Direction == TransactionDirection.Purchase)
-                        tradingPurchases += item.HasGram;
-                    else
-                        tradingSales += item.HasGram;
-                }
-            }
-            else
-            {
-                if (tx.Direction == TransactionDirection.Purchase)
-                    tradingPurchases += tx.HasGram;
-                else if (tx.Direction == TransactionDirection.Sale)
-                    tradingSales += tx.HasGram;
-            }
-        }
-
         var openUnpeggedSalesGram = await _goldLinking
             .GetOpenHasPositionAsync(null, null, cancellationToken)
             .ConfigureAwait(false);
 
-        var expectedGold = capitalGold + tradingPurchases - tradingSales;
+        var expectedGold = physicalVaultGold;
         var goldGapOrSurplus = Math.Round(-openUnpeggedSalesGram, 6);
+        var vaultHistory = BuildPhysicalVaultHistory(allMovements);
 
         var customers = await _uow.Customers.GetAllAsync(cancellationToken).ConfigureAwait(false);
 
         decimal customerDebt = 0, customerReceivable = 0;
         decimal personalDebt = 0, personalReceivable = 0;
+        decimal sahısGoldLiabilitiesHasGram = 0;
 
         foreach (var c in customers)
         {
-            var (goldBalance, _) = await _uow.CustomerTransactions
+            var book = await _uow.CustomerTransactions
                 .GetBalanceAsync(c.Id, cancellationToken)
                 .ConfigureAwait(false);
+            var goldBalance = book.GoldHasGram;
 
             if (c.Type == CustomerType.Cari)
             {
@@ -137,14 +122,22 @@ public class DashboardRawSummaryService : IDashboardSummaryService
             else if (c.Type == CustomerType.Sahis)
             {
                 if (goldBalance > 0)
+                {
                     personalDebt += goldBalance;
+                    sahısGoldLiabilitiesHasGram += goldBalance;
+                }
                 else if (goldBalance < 0)
                     personalReceivable += Math.Abs(goldBalance);
             }
         }
 
-        var netGold = ledgerGold + customerReceivable + personalReceivable - customerDebt - personalDebt;
-        var netCash = ledgerCash;
+        var netPhysicalEquityHasGram = physicalVaultGold - sahısGoldLiabilitiesHasGram;
+
+        var netGold = physicalVaultGold + customerReceivable + personalReceivable - customerDebt - personalDebt;
+        var netCashTry = ledgerCashTry;
+        var netCashUsd = ledgerCashUsd;
+        var netCashEur = ledgerCashEur;
+        var netCashGbp = ledgerCashGbp;
 
         var initialCapitalMovement = allMovements
             .Where(m => m.MovementType == SafeMovementType.Capital)
@@ -160,7 +153,7 @@ public class DashboardRawSummaryService : IDashboardSummaryService
         var cumulativePeggingProfit = profitRealizations.Sum(m => m.HasGram);
         var peggingCount = profitRealizations.Count;
 
-        var netGoldCapital = ledgerGold + customerReceivable + personalReceivable - customerDebt - personalDebt;
+        var netGoldCapital = physicalVaultGold + customerReceivable + personalReceivable - customerDebt - personalDebt;
 
         var todayTr = TurkeyClock.TodayDateOnly();
         var manualRow = await _goldRatesTable
@@ -177,27 +170,39 @@ public class DashboardRawSummaryService : IDashboardSummaryService
             fromManual = true;
         }
 
-        Console.WriteLine($"[Dashboard] Ledger Gold (safe, Has): {ledgerGold:F6}");
-        Console.WriteLine($"[Dashboard] Ledger Cash (TL): {ledgerCash:F2}");
+        Console.WriteLine($"[Dashboard] Ledger Gold (defter, Has): {ledgerGold:F6}");
+        Console.WriteLine($"[Dashboard] Fiziki kasa (SafeMovements, Has): {physicalVaultGold:F6}");
+        Console.WriteLine($"[Dashboard] Ledger Cash TL/USD/EUR/GBP: {ledgerCashTry:F2} / {ledgerCashUsd:F2} / {ledgerCashEur:F2} / {ledgerCashGbp:F2}");
         Console.WriteLine($"[Dashboard] Transactions Σ NetHasGram (excl. hybrid): {transactionNetHasSum:F6}");
         Console.WriteLine($"[Dashboard] Cari borç / alacak (Has): {customerDebt:F6} / {customerReceivable:F6}");
         Console.WriteLine($"[Dashboard] Şahıs borç / alacak (Has): {personalDebt:F6} / {personalReceivable:F6}");
-        Console.WriteLine($"[Dashboard] Net Altın (Has): {netGold:F6}  Net Nakit (TL): {netCash:F2}");
-        Console.WriteLine($"[Dashboard] ExpectedGold (kasa+işlem): {expectedGold:F6}  GoldGap/Surplus: {goldGapOrSurplus:F6}");
+        Console.WriteLine($"[Dashboard] Net Altın (Has): {netGold:F6}  Net Nakit TL/USD/EUR/GBP: {netCashTry:F2} / {netCashUsd:F2} / {netCashEur:F2} / {netCashGbp:F2}");
+        Console.WriteLine($"[Dashboard] Fiziki brüt (özet): {expectedGold:F6}  GoldGap/Surplus: {goldGapOrSurplus:F6}");
         Console.WriteLine($"[Dashboard] Manuel kur (etiket): {(labelMid?.ToString("F2") ?? "yok")}");
 
         return new DashboardSummaryDto(
             NetGoldCapitalHasGram: netGoldCapital,
-            TotalGoldInSafe: ledgerGold,
-            TotalCashInSafe: ledgerCash,
+            TotalGoldInSafe: physicalVaultGold,
+            TotalCashInSafe: ledgerCashTry,
+            TotalCashInSafeUsd: ledgerCashUsd,
+            TotalCashInSafeEur: ledgerCashEur,
+            TotalCashInSafeGbp: ledgerCashGbp,
             TotalCustomerGoldDebt: customerDebt,
             TotalCustomerGoldReceivable: customerReceivable,
             TotalPersonalGoldDebt: personalDebt,
             TotalPersonalGoldReceivable: personalReceivable,
-            PhysicalGoldBalance: ledgerGold,
-            PhysicalCashBalance: ledgerCash,
+            SahisGoldLiabilitiesHasGram: sahısGoldLiabilitiesHasGram,
+            NetPhysicalEquityHasGram: netPhysicalEquityHasGram,
+            PhysicalGoldBalance: physicalVaultGold,
+            PhysicalCashBalance: ledgerCashTry,
+            PhysicalCashBalanceUsd: ledgerCashUsd,
+            PhysicalCashBalanceEur: ledgerCashEur,
+            PhysicalCashBalanceGbp: ledgerCashGbp,
             NetGoldPositionHasGram: netGold,
-            NetCashPositionTl: netCash,
+            NetCashPositionTl: netCashTry,
+            NetCashPositionUsd: netCashUsd,
+            NetCashPositionEur: netCashEur,
+            NetCashPositionGbp: netCashGbp,
             ExpectedGold: expectedGold,
             GoldGapOrSurplus: goldGapOrSurplus,
             ProfitHasGram: profitHasGram,
@@ -211,6 +216,7 @@ public class DashboardRawSummaryService : IDashboardSummaryService
             RatesFromDefaultFallback: false,
             RatesFromManualOverride: fromManual,
             NetSermayeHasGramAtLivePrice: null,
-            NetGoldPositionTlApprox: null);
+            NetGoldPositionTlApprox: null,
+            PhysicalVaultHistory: vaultHistory);
     }
 }

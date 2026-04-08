@@ -26,10 +26,14 @@
               <span class="metric-val">{{ safeStatus()!.physicalGoldBalance | number:'1.2-2' }}</span>
               <small>Has Gr</small>
             </div>
-            <div class="metric-line">
+            <div class="metric-line metric-line--cash-stack">
               <mat-icon class="metric-icon metric-icon--cash">payments</mat-icon>
-              <span class="metric-val metric-val--cash">{{ safeStatus()!.physicalCashBalance | number:'1.0-0' }}</span>
-              <small>₺</small>
+              <div class="cash-stack">
+                <div><span class="metric-val metric-val--cash">{{ safeStatus()!.physicalCashBalance | number:'1.0-0' }}</span> <small>₺</small></div>
+                <div><span class="metric-val metric-val--cash">{{ safeStatus()!.physicalCashBalanceUsd | number:'1.2-2' }}</span> <small>USD</small></div>
+                <div><span class="metric-val metric-val--cash">{{ safeStatus()!.physicalCashBalanceEur | number:'1.2-2' }}</span> <small>EUR</small></div>
+                <div><span class="metric-val metric-val--cash">{{ safeStatus()!.physicalCashBalanceGbp | number:'1.2-2' }}</span> <small>GBP</small></div>
+              </div>
             </div>
           </div>
         } @else {
@@ -52,10 +56,14 @@
               <span class="metric-val">{{ safeStatus()!.netGoldPosition | number:'1.2-2' }}</span>
               <small>Has Gr</small>
             </div>
-            <div class="metric-line">
+            <div class="metric-line metric-line--cash-stack">
               <mat-icon class="metric-icon metric-icon--cash">payments</mat-icon>
-              <span class="metric-val metric-val--cash">{{ safeStatus()!.netCashPosition | number:'1.0-0' }}</span>
-              <small>₺</small>
+              <div class="cash-stack">
+                <div><span class="metric-val metric-val--cash">{{ safeStatus()!.netCashPosition | number:'1.0-0' }}</span> <small>₺</small></div>
+                <div><span class="metric-val metric-val--cash">{{ safeStatus()!.netCashPositionUsd | number:'1.2-2' }}</span> <small>USD</small></div>
+                <div><span class="metric-val metric-val--cash">{{ safeStatus()!.netCashPositionEur | number:'1.2-2' }}</span> <small>EUR</small></div>
+                <div><span class="metric-val metric-val--cash">{{ safeStatus()!.netCashPositionGbp | number:'1.2-2' }}</span> <small>GBP</small></div>
+              </div>
             </div>
           </div>
           <div class="net-hint">Kasa + Alacaklar − Borçlar</div>

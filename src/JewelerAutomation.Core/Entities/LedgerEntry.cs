@@ -18,7 +18,9 @@ public enum LedgerReferenceType
     CashToGoldConversion,
     ManualAdjustment,
     /// <summary>FIFO nakit bağlama işlemi (kasadan nakit çıkış + altın giriş).</summary>
-    LinkingProcess
+    LinkingProcess,
+    /// <summary>Döviz alış/satış — iki nakit satırı (bir para biriminden çıkış, diğerine giriş).</summary>
+    CurrencyExchange
 }
 
 public class LedgerEntry : BaseEntity
@@ -27,6 +29,10 @@ public class LedgerEntry : BaseEntity
     public LedgerEntryType EntryType { get; set; }
     public decimal GoldHasAmount { get; set; }
     public decimal CashAmount { get; set; }
+
+    /// <summary>Nakit giriş/çıkış satırları için para birimi; altın satırlarında <see cref="CashCurrency.Try"/> kalır.</summary>
+    public CashCurrency CashCurrency { get; set; }
+
     public LedgerReferenceType ReferenceType { get; set; }
     public Guid? ReferenceId { get; set; }
     public Guid? CustomerId { get; set; }
